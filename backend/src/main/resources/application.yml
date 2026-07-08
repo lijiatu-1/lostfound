@@ -37,7 +37,7 @@ wechat:
   secret: ${WECHAT_SECRET:your_wechat_app_secret}
 
 zhipu:
-  api-key: ${ZHIPU_API_KEY:your_zhipu_api_key}
+  api-key: ${ZHIPU_API_KEY:4a513637aa534c7fa088caa10924f0cc.N6p3Rr1N3DV6g0FO}
 
 logging:
   level:
