@@ -1,0 +1,38 @@
+<view class="container">
+  <view class="page-header">
+    <text class="page-title">我的发布</text>
+  </view>
+
+  <view class="filter-tabs">
+    <view class="filter-tab {{currentTab === 'all' ? 'active' : ''}}" bindtap="setTab" data-tab="all">全部</view>
+    <view class="filter-tab {{currentTab === 'active' ? 'active' : ''}}" bindtap="setTab" data-tab="active">进行中</view>
+    <view class="filter-tab {{currentTab === 'expired' ? 'active' : ''}}" bindtap="setTab" data-tab="expired">已过期</view>
+  </view>
+
+  <scroll-view scroll-y class="publish-list">
+    <view class="publish-card" wx:for="{{filteredList}}" wx:key="id" bindtap="goToDetail" data-id="{{item.id}}">
+      <view class="card-image-placeholder">
+        <text>{{item.type === 'lost' ? '🔍' : '✅'}}</text>
+      </view>
+      <view class="card-content">
+        <view class="card-header">
+          <text class="tag {{item.type === 'lost' ? 'tag-lost' : 'tag-found'}}">{{item.type === 'lost' ? '寻物' : '招领'}}</text>
+          <text class="status-tag" wx:if="{{item.status === 'expired'}}">已过期</text>
+          <text class="status-tag status-resolved" wx:if="{{item.status === 'resolved'}}">已解决</text>
+          <text class="status-tag status-active" wx:if="{{item.status === 'active'}}">进行中</text>
+        </view>
+        <text class="card-title">{{item.title}}</text>
+        <text class="card-info">{{item.locationName}} · {{item.timeAgo}}</text>
+        <view class="card-actions" catchtap="">
+          <view class="action-item" bindtap="deleteItem" data-id="{{item.id}}">删除</view>
+          <view class="action-item action-item-renew" wx:if="{{item.status === 'expired' || item.status === 'resolved'}}" bindtap="renewItem" data-id="{{item.id}}">延期</view>
+        </view>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{filteredList.length === 0}}">
+      <text class="empty-icon">📝</text>
+      <text class="empty-text">暂无发布信息</text>
+    </view>
+  </scroll-view>
+</view>

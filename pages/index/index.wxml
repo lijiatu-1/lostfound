@@ -1,0 +1,74 @@
+<view class="container">
+  <view class="search-bar">
+    <view class="search-input-wrap">
+      <text class="search-icon">🔍</text>
+      <input class="search-input" placeholder="搜索物品名称、地点..." value="{{keyword}}" bindinput="onSearchInput" bindconfirm="onSearchConfirm" />
+      <text class="clear-icon" wx:if="{{keyword}}" bindtap="clearSearch">✕</text>
+    </view>
+  </view>
+
+  <view class="tabs">
+    <view class="tab-item {{currentTab === 0 ? 'active' : ''}}" bindtap="switchTab" data-tab="0">全部</view>
+    <view class="tab-item {{currentTab === 1 ? 'active' : ''}}" bindtap="switchTab" data-tab="1">寻物</view>
+    <view class="tab-item {{currentTab === 2 ? 'active' : ''}}" bindtap="switchTab" data-tab="2">招领</view>
+  </view>
+
+  <scroll-view class="category-bar" scroll-x enable-flex>
+    <view class="category-pill {{currentCategory === '' ? 'active' : ''}}" bindtap="switchCategory" data-category="">全部</view>
+    <view class="category-pill {{currentCategory === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" bindtap="switchCategory" data-category="{{item}}">{{item}}</view>
+  </scroll-view>
+
+  <scroll-view class="list-container" scroll-y refresher-enabled refresher-triggered="{{isRefreshing}}" bindrefresherrefresh="onRefresh">
+    <view wx:if="{{loading}}" class="loading-wrap">
+      <view class="skeleton-card" wx:for="{{3}}" wx:key="*this">
+        <view class="skeleton-image"></view>
+        <view class="skeleton-content">
+          <view class="skeleton-line skeleton-title"></view>
+          <view class="skeleton-line skeleton-info"></view>
+          <view class="skeleton-line skeleton-time"></view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:elif="{{filteredList.length === 0}}" class="empty-state">
+      <view class="empty-icon">📦</view>
+      <view class="empty-text">暂无相关信息</view>
+      <view class="empty-hint">快来发布第一条失物信息吧！</view>
+      <view class="empty-btn" bindtap="goToPublish">去发布</view>
+    </view>
+
+    <view wx:else class="item-list">
+      <view class="result-count">共 {{filteredList.length}} 条信息</view>
+      <view class="item-card" wx:for="{{filteredList}}" wx:key="id" bindtap="goToDetail" data-id="{{item.id}}">
+        <view class="image-wrap">
+          <image wx:if="{{item.imageList && item.imageList.length > 0}}" class="item-image" src="{{item.imageList[0]}}" mode="aspectFill" />
+          <view wx:else class="item-image-placeholder">
+            <text class="image-icon">{{item.type === 'lost' ? '🔍' : '✅'}}</text>
+          </view>
+          <view class="image-count" wx:if="{{item.imageList && item.imageList.length > 1}}">
+            <text>{{item.imageList.length}}张</text>
+          </view>
+        </view>
+        <view class="item-content">
+          <view class="item-header">
+            <text class="item-title">{{item.title}}</text>
+          </view>
+          <view class="item-tags-row">
+            <text class="tag {{item.type === 'lost' ? 'tag-lost' : 'tag-found'}}">{{item.type === 'lost' ? '寻物' : '招领'}}</text>
+            <text class="tag tag-category" wx:if="{{item.category}}">{{item.category}}</text>
+          </view>
+          <view class="item-info">
+            <text class="item-location">📍 {{item.locationName}}</text>
+          </view>
+          <view class="item-footer">
+            <text class="item-time">{{item.timeAgo}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <view class="fab-btn" bindtap="goToPublish">
+    <text class="fab-icon">+</text>
+  </view>
+</view>

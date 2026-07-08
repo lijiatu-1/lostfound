@@ -1,0 +1,23 @@
+<view class="container">
+  <view class="page-header">
+    <text class="page-title">我的申请</text>
+  </view>
+
+  <scroll-view scroll-y class="claim-list">
+    <view class="claim-card" wx:for="{{claimList}}" wx:key="id" bindtap="goToDetail" data-item-id="{{item.itemId}}">
+      <view class="card-content">
+        <view class="card-header">
+          <text class="tag {{item.type === 'help' ? 'tag-help' : 'tag-claim'}}">{{item.type === 'help' ? '帮助' : '认领'}}</text>
+          <text class="status-tag status-{{item.status}}">{{item.statusText}}</text>
+        </view>
+        <text class="card-title">{{item.content}}</text>
+        <text class="card-info">{{item.timeAgo}}</text>
+      </view>
+    </view>
+
+    <view class="empty-state" wx:if="{{claimList.length === 0}}">
+      <text class="empty-icon">🤝</text>
+      <text class="empty-text">暂无申请记录</text>
+    </view>
+  </scroll-view>
+</view>

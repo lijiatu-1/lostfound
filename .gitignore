@@ -1,0 +1,40 @@
+# ===== Java / Spring Boot =====
+target/
+*.class
+*.jar
+*.war
+*.log
+
+# ===== Maven =====
+*.pom.releaseBackup
+pom.xml.releaseBackup
+
+# ===== IDE =====
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+
+# ===== OS =====
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# ===== 微信小程序 =====
+node_modules/
+
+# ===== 上传文件（用户数据不提交） =====
+uploads/
+
+# ===== 本地工具 =====
+.codemap/
+.codemap.json
+
+# ===== 微信开发者工具个人配置 =====
+project.private.config.json
+
+# ===== 环境变量 / 本地配置 =====
+.env
+.env.local
+application-local.yml

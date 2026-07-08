@@ -1,0 +1,109 @@
+<view class="container">
+  <view wx:if="{{isLoading}}" class="loading-wrap">
+    <text class="loading-text">加载中...</text>
+  </view>
+  <block wx:else>
+  <scroll-view scroll-y class="scroll-container">
+    <swiper wx:if="{{item.imageList && item.imageList.length > 0}}" class="detail-swiper" indicator-dots="{{item.imageList.length > 1}}" indicator-color="rgba(255,255,255,0.5)" indicator-active-color="#ffffff" autoplay circular>
+      <swiper-item wx:for="{{item.imageList}}" wx:key="*this">
+        <image class="swiper-image" src="{{item}}" mode="aspectFill" bindtap="previewImage" data-src="{{item}}" />
+      </swiper-item>
+    </swiper>
+    <view wx:else class="detail-image-placeholder">
+      <text class="placeholder-icon">{{item.type === 'lost' ? '🔍' : '✅'}}</text>
+    </view>
+
+    <view class="detail-content">
+      <view class="detail-header">
+        <text class="tag {{item.type === 'lost' ? 'tag-lost' : 'tag-found'}}">{{item.type === 'lost' ? '寻物' : '招领'}}</text>
+        <view class="header-right">
+          <text class="edit-btn" wx:if="{{isOwner && item.status === 'active'}}" bindtap="goEdit">编辑</text>
+          <text class="detail-time">{{item.timeAgo}}</text>
+        </view>
+      </view>
+
+      <text class="detail-title">{{item.title}}</text>
+
+      <view class="detail-info">
+        <view class="info-item">
+          <text class="info-icon">📍</text>
+          <text class="info-text">{{item.locationName}}</text>
+        </view>
+        <view class="info-item" wx:if="{{item.status === 'resolved'}}">
+          <text class="info-icon">✅</text>
+          <text class="info-text">已解决</text>
+        </view>
+      </view>
+
+      <view wx:if="{{item.tagList && item.tagList.length > 0}}" class="tag-row">
+        <text class="item-tag" wx:for="{{item.tagList}}" wx:key="*this">{{item}}</text>
+      </view>
+
+      <view class="detail-section">
+        <text class="section-title">详细描述</text>
+        <text class="detail-desc">{{item.description}}</text>
+      </view>
+
+      <!-- 评论区：仅寻物帖显示 -->
+      <view class="detail-section comments-section" wx:if="{{item.type === 'lost'}}">
+        <text class="section-title">线索与评论 ({{comments.length}})</text>
+
+        <view class="comment-input-wrap" wx:if="{{item.status === 'active' && !isOwner && isAuthenticated}}">
+          <textarea class="comment-input" placeholder="留下你知道的线索..." value="{{commentContent}}" bindinput="onCommentInput" maxlength="500" />
+          <view class="comment-submit" bindtap="submitComment">发表</view>
+        </view>
+
+        <view class="comment-list" wx:if="{{comments.length > 0}}">
+          <view class="comment-item" wx:for="{{comments}}" wx:key="id">
+            <view class="comment-header">
+              <text class="comment-user">{{item.nickname}}</text>
+              <text class="comment-time">{{item.timeAgo}}</text>
+            </view>
+            <text class="comment-content">{{item.content}}</text>
+          </view>
+        </view>
+        <view wx:else class="comment-empty">
+          <text>暂无评论，留下你知道的线索吧</text>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+
+  <!-- 非发布者已认证：active状态显示联系按钮 -->
+  <view class="action-bar" wx:if="{{!isOwner && item.status === 'active' && isAuthenticated}}">
+    <view class="action-btn action-btn-primary" bindtap="copyPhone">
+      <text>联系TA</text>
+    </view>
+  </view>
+
+  <!-- 非发布者未认证：显示认证提示 -->
+  <view class="action-bar" wx:if="{{!isOwner && item.status === 'active' && !isAuthenticated}}">
+    <view class="action-btn action-btn-auth" bindtap="goToAuth">
+      <text>登录并认证后可联系失主</text>
+    </view>
+  </view>
+
+  <!-- 非发布者：过期/已解决，不显示底部按钮 -->
+  <!-- 无 action-bar -->
+
+  <!-- 发布者：进行中且不能延期 -->
+  <view class="action-bar" wx:if="{{isOwner && item.status === 'active' && !canRenew}}">
+    <view class="action-btn action-btn-secondary" bindtap="deleteItem">
+      <text>删除</text>
+    </view>
+    <view class="action-btn action-btn-primary" bindtap="markResolved">
+      <text>标记已解决</text>
+    </view>
+  </view>
+
+  <!-- 发布者：可延期（过期/已解决/即将过期） -->
+  <view class="action-bar" wx:if="{{isOwner && canRenew}}">
+    <view class="action-btn action-btn-secondary" bindtap="deleteItem">
+      <text>删除</text>
+    </view>
+    <view class="action-btn action-btn-primary" bindtap="renewItem">
+      <text>延期7天</text>
+    </view>
+  </view>
+  </block>
+</view>
