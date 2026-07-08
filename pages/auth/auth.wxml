@@ -1,0 +1,43 @@
+<view class="container">
+  <view class="auth-header">
+    <view class="header-icon">🎓</view>
+    <text class="header-title">校园卡认证</text>
+    <text class="header-desc">完成认证后即可发布、认领和帮助他人</text>
+  </view>
+
+  <view class="auth-content">
+    <view class="form-item">
+      <text class="form-label">学号</text>
+      <input class="form-input" placeholder="请输入学号" value="{{formData.studentId}}" bindinput="onInput" data-field="studentId" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">姓名</text>
+      <input class="form-input" placeholder="请输入姓名" value="{{formData.realName}}" bindinput="onInput" data-field="realName" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">校园卡照片</text>
+      <view class="upload-area" bindtap="chooseCardPhoto">
+        <image wx:if="{{cardPhoto || tempPhoto}}" class="upload-image" src="{{cardPhoto || tempPhoto}}" mode="aspectFill" />
+        <view wx:else class="upload-placeholder">
+          <text class="upload-icon">📷</text>
+          <text class="upload-text">点击上传校园卡正面照片</text>
+          <text class="upload-hint">建议手持校园卡拍照，人脸与校园卡同框</text>
+        </view>
+      </view>
+    </view>
+
+    <view class="tips-card">
+      <text class="tips-title">💡 认证说明</text>
+      <text class="tips-item">• 提交后将由管理员进行审核</text>
+      <text class="tips-item">• 审核通过后将获得完整使用权限</text>
+      <text class="tips-item">• 同一学号仅能绑定一个微信账号</text>
+    </view>
+  </view>
+
+  <view class="auth-footer">
+    <view class="submit-btn" bindtap="submitCertification">提交认证</view>
+    <text class="footer-text">提交即表示同意《用户协议》和《隐私政策》</text>
+  </view>
+</view>

@@ -1,0 +1,40 @@
+<view class="container">
+  <view class="page-header">
+    <text class="page-title">认证审核</text>
+  </view>
+
+  <view wx:if="{{isLoading}}" class="loading-wrap">
+    <text class="loading-text">加载中...</text>
+  </view>
+
+  <scroll-view wx:else scroll-y class="cert-list">
+    <block wx:if="{{certList.length === 0}}">
+      <view class="empty-state">
+        <text class="empty-icon">📋</text>
+        <text class="empty-text">暂无待审核的认证</text>
+      </view>
+    </block>
+    <block wx:else>
+      <view class="cert-card" wx:for="{{certList}}" wx:key="id">
+        <view class="cert-info">
+          <view class="cert-row">
+            <text class="cert-label">姓名</text>
+            <text class="cert-value">{{item.realName}}</text>
+          </view>
+          <view class="cert-row">
+            <text class="cert-label">学号</text>
+            <text class="cert-value">{{item.studentId}}</text>
+          </view>
+          <view class="cert-row">
+            <text class="cert-label">提交时间</text>
+            <text class="cert-value">{{item.timeAgo}}</text>
+          </view>
+        </view>
+        <view class="cert-actions">
+          <view class="btn-approve" bindtap="handleReview" data-id="{{item.id}}" data-action="accept">通过</view>
+          <view class="btn-reject" bindtap="handleReview" data-id="{{item.id}}" data-action="reject">拒绝</view>
+        </view>
+      </view>
+    </block>
+  </scroll-view>
+</view>

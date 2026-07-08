@@ -1,0 +1,68 @@
+<view class="container">
+  <view class="upload-section">
+    <view class="upload-title">上传图片</view>
+    <view class="image-grid">
+      <view class="image-item" wx:for="{{imageUrls}}" wx:key="*this">
+        <image class="grid-image" src="{{item}}" mode="aspectFill" />
+        <view class="image-delete" catchtap="deleteImage" data-index="{{index}}">✕</view>
+      </view>
+      <view class="image-add" wx:if="{{imageUrls.length < 9}}" bindtap="chooseImage">
+        <text class="add-icon">+</text>
+        <text class="add-text">{{imageUrls.length}}/9</text>
+      </view>
+    </view>
+    <text class="upload-hint">最多上传9张，支持JPG/PNG格式，单张不超过5MB</text>
+    <view class="ai-btn" wx:if="{{imageUrls.length > 0 && !imageUploading}}" bindtap="aiRecognize">
+      <text class="ai-btn-text">{{aiLoading ? '识别中...' : ' AI智能识别'}}</text>
+    </view>
+  </view>
+
+  <view class="form-section">
+    <view class="form-item">
+      <text class="form-label">类型</text>
+      <view class="type-selector" bindtap="switchType">
+        <text class="type-text">{{type === 'lost' ? '寻物' : '招领'}}</text>
+        <text class="type-arrow">></text>
+      </view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">分类</text>
+      <scroll-view class="category-scroll" scroll-x enable-flex>
+        <view class="cat-pill {{selectedCategory === item ? 'active' : ''}}" wx:for="{{categories}}" wx:key="*this" bindtap="selectCategory" data-category="{{item}}">{{item}}</view>
+      </scroll-view>
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">标题</text>
+      <input class="form-input" placeholder="请输入物品名称" value="{{formData.title}}" bindinput="onInput" data-field="title" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">地点</text>
+      <input class="form-input" placeholder="请输入丢失/捡到地点" value="{{formData.location}}" bindinput="onInput" data-field="location" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">描述</text>
+      <textarea class="form-textarea" placeholder="请详细描述物品特征、丢失/捡到时间等信息" value="{{formData.description}}" bindinput="onInput" data-field="description" />
+    </view>
+
+    <view class="form-item">
+      <text class="form-label">联系电话</text>
+      <input class="form-input" placeholder="请输入手机号，方便他人联系你" type="number" maxlength="11" value="{{formData.phone}}" bindinput="onInput" data-field="phone" />
+    </view>
+
+    <view class="location-section">
+      <view class="location-info">
+        <text class="location-icon">📍</text>
+        <text class="location-text">{{currentLocation || '未获取位置'}}</text>
+      </view>
+      <view class="location-btn" bindtap="getLocation">重新定位</view>
+    </view>
+  </view>
+
+  <view class="submit-btn" bindtap="submitForm">
+    <text class="submit-text">{{editMode ? '保存' : '发布'}}</text>
+  </view>
+</view>
