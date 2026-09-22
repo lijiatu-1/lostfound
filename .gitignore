@@ -38,3 +38,6 @@ project.private.config.json
 .env
 .env.local
 application-local.yml
+
+# Generated per-environment mini-program API origin. Never commit deployment-only settings.
+utils/runtime-config.local.js

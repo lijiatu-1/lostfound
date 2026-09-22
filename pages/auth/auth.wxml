@@ -19,7 +19,7 @@
     <view class="form-item">
       <text class="form-label">校园卡照片</text>
       <view class="upload-area" bindtap="chooseCardPhoto">
-        <image wx:if="{{cardPhoto || tempPhoto}}" class="upload-image" src="{{cardPhoto || tempPhoto}}" mode="aspectFill" />
+        <image wx:if="{{cardPhotoUrl || tempPhoto}}" class="upload-image" src="{{cardPhotoUrl || tempPhoto}}" mode="aspectFill" />
         <view wx:else class="upload-placeholder">
           <text class="upload-icon">📷</text>
           <text class="upload-text">点击上传校园卡正面照片</text>

@@ -6,7 +6,8 @@ Page({
       realName: '',
       studentId: ''
     },
-    cardPhoto: '',
+    cardPhotoAssetId: '',
+    cardPhotoUrl: '',
     tempPhoto: '',  // 上传中的本地预览路径，不参与提交
     status: 'unauthorized',
     isSubmitting: false
@@ -53,13 +54,13 @@ Page({
           sourceType: sourceType,
           success: (res) => {
             const tempPath = res.tempFiles[0].tempFilePath
-            // 先用本地路径做预览，不存到 cardPhoto（防止上传失败时提交了本地路径）
-            this.setData({ tempPhoto: tempPath, cardPhoto: '' })
+            // 本地路径只用于上传中的预览；认证提交始终只携带受控资产 ID。
+            this.setData({ tempPhoto: tempPath, cardPhotoAssetId: '', cardPhotoUrl: '' })
             wx.showLoading({ title: '上传图片中...' })
-            uploadImage(tempPath)
-              .then(url => {
+            uploadImage(tempPath, 'certification')
+              .then(asset => {
                 wx.hideLoading()
-                this.setData({ cardPhoto: url, tempPhoto: '' })
+                this.setData({ cardPhotoAssetId: asset.assetId, cardPhotoUrl: asset.url, tempPhoto: '' })
               })
               .catch(err => {
                 wx.hideLoading()
@@ -95,7 +96,7 @@ Page({
       return
     }
 
-    if (!this.data.cardPhoto) {
+    if (!this.data.cardPhotoAssetId) {
       wx.showToast({
         title: '请上传校园卡照片',
         icon: 'none'
@@ -108,7 +109,7 @@ Page({
     const data = {
       realName: realName.trim(),
       studentId: studentId.trim(),
-      cardPhoto: this.data.cardPhoto
+      cardPhotoAssetId: this.data.cardPhotoAssetId
     }
 
     authApi.certification(data)

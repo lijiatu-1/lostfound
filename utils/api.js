@@ -1,38 +1,78 @@
-const BASE_URL = 'http://localhost:8080/api'
+import { API_BASE_URL, IS_API_CONFIGURED } from './config.js'
 
-function request(url, method = 'GET', data = {}) {
+function apiNotConfiguredError() {
+  return { code: 'API_NOT_CONFIGURED', message: '服务地址尚未配置，请联系管理员' }
+}
+
+function getErrorMessage(payload, fallback) {
+  if (payload && typeof payload === 'object') return payload.message || payload.error || fallback
+  return typeof payload === 'string' ? payload : fallback
+}
+
+export function resolveAssetUrl(value) {
+  if (!value) return ''
+  if (/^https?:\/\//i.test(value)) return value
+  if (!IS_API_CONFIGURED) return ''
+  const origin = API_BASE_URL.replace(/\/api$/, '')
+  if (value.charAt(0) === '/') return origin + value
+  return origin + '/api/assets/' + encodeURIComponent(value) + '/content'
+}
+
+function request(url, method = 'GET', data) {
   return new Promise((resolve, reject) => {
-    const token = wx.getStorageSync('token')
+    if (!IS_API_CONFIGURED) {
+      reject(apiNotConfiguredError())
+      return
+    }
 
+    const token = wx.getStorageSync('token')
     wx.request({
-      url: BASE_URL + url,
-      method: method,
-      data: data,
+      url: API_BASE_URL + url,
+      method,
+      data,
       header: {
         'Content-Type': 'application/json',
-        'Authorization': token ? 'Bearer ' + token : ''
+        Authorization: token ? 'Bearer ' + token : ''
       },
       success: (res) => {
-        if (res.statusCode === 200) {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
           resolve(res.data)
-        } else if (res.statusCode === 401) {
-          // Token 过期或无效：清除旧 token，重新登录
+          return
+        }
+
+        if (res.statusCode === 401) {
           wx.removeStorageSync('token')
           const app = getApp()
-          if (app && app.login) {
-            app.login()
-          }
-          reject({ message: '登录已过期，请重试' })
-        } else {
-          reject(res.data || { message: '请求失败' })
+          if (app && app.login) app.globalData.loginPromise = app.login().catch(() => null)
+          reject({ code: 'UNAUTHORIZED', message: '登录已过期，请重试' })
+          return
         }
+
+        reject({ code: res.statusCode, message: getErrorMessage(res.data, '请求失败') })
       },
       fail: (err) => {
-        reject({ message: '网络请求失败，请检查后端服务是否启动' })
+        reject({ code: 'NETWORK_ERROR', message: (err && err.errMsg) || '网络异常，请检查网络后重试' })
       }
     })
   })
 }
+
+function buildQuery(params) {
+  if (!params) return ''
+  const parts = []
+  Object.keys(params).forEach((key) => {
+    const value = params[key]
+    if (value !== undefined && value !== null && value !== '') {
+      parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(value))
+    }
+  })
+  return parts.length ? '?' + parts.join('&') : ''
+}
+
+function get(url, params) { return request(url + buildQuery(params), 'GET') }
+function post(url, data) { return request(url, 'POST', data) }
+function put(url, data) { return request(url, 'PUT', data) }
+function del(url) { return request(url, 'DELETE') }
 
 export const authApi = {
   login: (code) => post('/auth/login', { code }),
@@ -43,58 +83,36 @@ export const authApi = {
   reviewCertification: (id, data) => post('/auth/certification/' + id + '/review', data)
 }
 
-function buildQuery(params) {
-  if (!params) return ''
-  const parts = []
-  for (const key in params) {
-    if (params[key] !== undefined && params[key] !== null && params[key] !== '') {
-      parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]))
-    }
-  }
-  return parts.length > 0 ? '?' + parts.join('&') : ''
-}
-
-/**
- * GET 请求不传 body，参数全部在 query string 中
- */
-function get(url, params) {
-  return request(url + buildQuery(params), 'GET')
-}
-
-function post(url, data) {
-  return request(url, 'POST', data)
-}
-
-function put(url, data) {
-  return request(url, 'PUT', data)
-}
-
-function del(url) {
-  return request(url, 'DELETE')
-}
-
 export const itemApi = {
   getItems: (params) => get('/items', params),
   getItem: (id) => get('/items/' + id),
-  getContact: (id) => get('/items/' + id + '/contact'),
   getCategories: () => get('/items/categories'),
   publish: (data) => post('/items', data),
   update: (id, data) => put('/items/' + id, data),
   delete: (id) => del('/items/' + id),
   getMyItems: () => get('/items/my'),
   resolve: (id) => post('/items/' + id + '/resolve'),
-  renew: (id) => post('/items/' + id + '/renew')
+  reopen: (id) => post('/items/' + id + '/reopen')
 }
 
 export const applicationApi = {
-  apply: (data) => post('/applications', data),
+  // Application kind is derived by the server from the item type.
+  apply: ({ itemId, content }) => post('/applications', { itemId, content }),
   getByItem: (itemId) => get('/applications/item/' + itemId),
   getMyApplications: () => get('/applications/my'),
   handle: (id, action) => post('/applications/' + id + '/handle', { action })
 }
 
+export const conversationApi = {
+  getConversations: () => get('/conversations'),
+  getMessages: (id, params) => get('/conversations/' + id + '/messages', params),
+  sendMessage: (id, content) => post('/conversations/' + id + '/messages', { content }),
+  markRead: (id) => post('/conversations/' + id + '/read')
+}
+
 export const messageApi = {
   getMessages: () => get('/messages'),
+  // The backend aggregates system-notification and conversation unread counts.
   getUnreadCount: () => get('/messages/count'),
   markRead: (id) => post('/messages/' + id + '/read'),
   markAllRead: () => post('/messages/read-all')
@@ -107,35 +125,42 @@ export const commentApi = {
 }
 
 export const aiApi = {
-  recognize: (imageUrl) => post('/ai/recognize', { imageUrl })
+  recognize: (assetId) => post('/ai/recognize', { assetId })
 }
 
-export function uploadImage(filePath) {
+export function uploadImage(filePath, purpose = 'item') {
   return new Promise((resolve, reject) => {
+    if (!IS_API_CONFIGURED) {
+      reject(apiNotConfiguredError())
+      return
+    }
+
     const token = wx.getStorageSync('token')
     wx.uploadFile({
-      url: BASE_URL + '/upload',
-      filePath: filePath,
+      url: API_BASE_URL + '/assets',
+      filePath,
       name: 'file',
-      header: {
-        'Authorization': token ? 'Bearer ' + token : ''
-      },
+      formData: { purpose },
+      header: { Authorization: token ? 'Bearer ' + token : '' },
       success: (res) => {
+        let data
         try {
-          const data = JSON.parse(res.data)
-          if (res.statusCode === 200 && data.success) {
-            // 用正则确保只替换末尾的 /api
-            const baseUrl = BASE_URL.replace(/\/api$/, '')
-            resolve(baseUrl + data.url)
-          } else {
-            reject(data)
-          }
+          data = JSON.parse(res.data)
         } catch (e) {
-          reject({ message: '上传失败' })
+          reject({ message: '上传服务返回了无效数据' })
+          return
         }
+
+        const assetId = data && (data.assetId || data.id || (data.asset && data.asset.id))
+        if (res.statusCode >= 200 && res.statusCode < 300 && data && data.success !== false && assetId) {
+          const rawUrl = data.url || (data.asset && data.asset.url) || String(assetId)
+          resolve({ assetId: String(assetId), url: resolveAssetUrl(rawUrl) })
+          return
+        }
+        reject({ code: res.statusCode, message: getErrorMessage(data, '上传失败') })
       },
       fail: (err) => {
-        reject({ message: err.errMsg || '网络请求失败' })
+        reject({ code: 'NETWORK_ERROR', message: (err && err.errMsg) || '网络异常，请检查网络后重试' })
       }
     })
   })

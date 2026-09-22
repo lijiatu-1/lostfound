@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -31,15 +32,18 @@ public class Item {
     private String description;
 
     @TableField("phone")
+    @JsonIgnore
     private String phone;
 
     @TableField("location_name")
     private String locationName;
 
     @TableField("location_lat")
+    @JsonIgnore
     private Double locationLat;
 
     @TableField("location_lng")
+    @JsonIgnore
     private Double locationLng;
 
     @TableField("images")
