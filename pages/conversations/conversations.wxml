@@ -1,0 +1,10 @@
+<view class="page">
+  <view class="title">私信会话</view>
+  <view wx:if="{{loading}}" class="state">加载中...</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button bindtap="retry">重试</button></view>
+  <view wx:elif="{{!conversations.length}}" class="state">暂无私信。申请获批后会出现在这里。</view>
+  <view wx:else class="card" wx:for="{{conversations}}" wx:key="id" data-id="{{item.id}}" bindtap="open">
+    <view>{{item.itemTitle || ('物品 #' + item.itemId)}}</view>
+    <view class="meta">{{item.status === 'open' ? '沟通中' : '已结束 · 历史可读'}} · {{item.timeAgo}}</view>
+  </view>
+</view>

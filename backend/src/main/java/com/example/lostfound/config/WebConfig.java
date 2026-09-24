@@ -1,13 +1,12 @@
 package com.example.lostfound.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.filter.CorsFilter;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -20,6 +19,7 @@ public class WebConfig implements WebMvcConfigurer {
     }
 
     @Bean
+    @Profile("dev")
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         // 限制允许的来源，不再使用通配符 + credentials 的不安全组合
@@ -46,20 +46,4 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/images/**");
     }
 
-    @Value("${app.upload.dir:uploads/images}")
-    private String uploadDir;
-
-    @Override
-    public void addResourceHandlers(ResourceHandlerRegistry registry) {
-        String dir;
-        if (new java.io.File(uploadDir).isAbsolute()) {
-            dir = uploadDir;
-        } else {
-            dir = System.getProperty("user.dir") + "/" + uploadDir;
-        }
-        // 确保路径以 / 结尾
-        if (!dir.endsWith("/")) dir = dir + "/";
-        registry.addResourceHandler("/images/**")
-                .addResourceLocations("file:" + dir);
-    }
 }

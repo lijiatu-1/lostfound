@@ -4,6 +4,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -21,6 +22,21 @@ public class GlobalExceptionHandler {
         response.put("success", false);
         response.put("message", e.getMessage());
         return ResponseEntity.badRequest().body(response);
+    }
+
+    @ExceptionHandler(SecurityException.class)
+    public ResponseEntity<Map<String, Object>> handleSecurityException(SecurityException e) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("success", false, "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalStateException(IllegalStateException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("success", false, "message", e.getMessage()));
+    }
+
+    @ExceptionHandler(DuplicateKeyException.class)
+    public ResponseEntity<Map<String, Object>> handleDuplicateKeyException(DuplicateKeyException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("success", false, "message", "记录已存在，请刷新后重试"));
     }
 
     @ExceptionHandler(NullPointerException.class)

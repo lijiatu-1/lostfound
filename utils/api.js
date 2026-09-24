@@ -11,11 +11,13 @@ function getErrorMessage(payload, fallback) {
 
 export function resolveAssetUrl(value) {
   if (!value) return ''
-  if (/^https?:\/\//i.test(value)) return value
   if (!IS_API_CONFIGURED) return ''
   const origin = API_BASE_URL.replace(/\/api$/, '')
-  if (value.charAt(0) === '/') return origin + value
-  return origin + '/api/assets/' + encodeURIComponent(value) + '/content'
+  if (/^https?:\/\//i.test(value)) {
+    return value.startsWith(origin + '/api/assets/') ? value : ''
+  }
+  if (/^\/api\/assets\/[0-9]+\/content$/.test(value)) return origin + value
+  return /^[0-9]+$/.test(String(value)) ? origin + '/api/assets/' + encodeURIComponent(value) + '/content' : ''
 }
 
 function request(url, method = 'GET', data) {
@@ -43,7 +45,12 @@ function request(url, method = 'GET', data) {
         if (res.statusCode === 401) {
           wx.removeStorageSync('token')
           const app = getApp()
-          if (app && app.login) app.globalData.loginPromise = app.login().catch(() => null)
+          if (app) {
+            app.globalData.userId = ''
+            app.globalData.isAuthenticated = false
+            app.globalData.isAdmin = false
+            if (url !== '/auth/login' && app.login) app.globalData.loginPromise = app.login().catch(() => null)
+          }
           reject({ code: 'UNAUTHORIZED', message: '登录已过期，请重试' })
           return
         }
@@ -92,7 +99,8 @@ export const itemApi = {
   delete: (id) => del('/items/' + id),
   getMyItems: () => get('/items/my'),
   resolve: (id) => post('/items/' + id + '/resolve'),
-  reopen: (id) => post('/items/' + id + '/reopen')
+  reopen: (id) => post('/items/' + id + '/reopen'),
+  renew: (id) => post('/items/' + id + '/renew')
 }
 
 export const applicationApi = {
@@ -162,6 +170,25 @@ export function uploadImage(filePath, purpose = 'item') {
       fail: (err) => {
         reject({ code: 'NETWORK_ERROR', message: (err && err.errMsg) || '网络异常，请检查网络后重试' })
       }
+    })
+  })
+}
+
+export function downloadPrivateAsset(assetId) {
+  return new Promise((resolve, reject) => {
+    if (!IS_API_CONFIGURED || !/^[0-9]+$/.test(String(assetId))) {
+      reject({ message: '图片资源不可用' })
+      return
+    }
+    const token = wx.getStorageSync('token')
+    wx.downloadFile({
+      url: API_BASE_URL + '/assets/' + assetId + '/content',
+      header: { Authorization: token ? 'Bearer ' + token : '' },
+      success: res => {
+        if (res.statusCode === 200) resolve(res.tempFilePath)
+        else reject({ message: '无权查看或图片已失效' })
+      },
+      fail: () => reject({ message: '图片加载失败' })
     })
   })
 }

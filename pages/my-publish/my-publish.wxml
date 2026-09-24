@@ -6,6 +6,8 @@
   <view class="filter-tabs">
     <view class="filter-tab {{currentTab === 'all' ? 'active' : ''}}" bindtap="setTab" data-tab="all">全部</view>
     <view class="filter-tab {{currentTab === 'active' ? 'active' : ''}}" bindtap="setTab" data-tab="active">进行中</view>
+    <view class="filter-tab {{currentTab === 'processing' ? 'active' : ''}}" bindtap="setTab" data-tab="processing">处理中</view>
+    <view class="filter-tab {{currentTab === 'resolved' ? 'active' : ''}}" bindtap="setTab" data-tab="resolved">已解决</view>
     <view class="filter-tab {{currentTab === 'expired' ? 'active' : ''}}" bindtap="setTab" data-tab="expired">已过期</view>
   </view>
 
@@ -20,17 +22,21 @@
           <text class="status-tag" wx:if="{{item.status === 'expired'}}">已过期</text>
           <text class="status-tag status-resolved" wx:if="{{item.status === 'resolved'}}">已解决</text>
           <text class="status-tag status-active" wx:if="{{item.status === 'active'}}">进行中</text>
+          <text class="status-tag" wx:if="{{item.status === 'processing'}}">处理中</text>
         </view>
         <text class="card-title">{{item.title}}</text>
         <text class="card-info">{{item.locationName}} · {{item.timeAgo}}</text>
-        <view class="card-actions" catchtap="">
-          <view class="action-item" bindtap="deleteItem" data-id="{{item.id}}">删除</view>
-          <view class="action-item action-item-renew" wx:if="{{item.status === 'expired' || item.status === 'resolved'}}" bindtap="renewItem" data-id="{{item.id}}">延期</view>
+        <view class="card-actions">
+          <view class="action-item" catchtap="deleteItem" data-id="{{item.id}}">删除</view>
+          <view class="action-item action-item-renew" wx:if="{{item.status === 'expired'}}" catchtap="renewItem" data-id="{{item.id}}">延期</view>
         </view>
       </view>
     </view>
 
-    <view class="empty-state" wx:if="{{filteredList.length === 0}}">
+    <view class="empty-state" wx:if="{{error}}">
+      <text class="empty-text">{{error}}</text><button bindtap="retry">重试</button>
+    </view>
+    <view class="empty-state" wx:elif="{{filteredList.length === 0}}">
       <text class="empty-icon">📝</text>
       <text class="empty-text">暂无发布信息</text>
     </view>

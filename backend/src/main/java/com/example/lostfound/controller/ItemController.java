@@ -2,448 +2,282 @@ package com.example.lostfound.controller;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.lostfound.entity.Item;
+import com.example.lostfound.mapper.ItemMapper;
 import com.example.lostfound.service.ApplicationService;
+import com.example.lostfound.service.ConversationService;
 import com.example.lostfound.service.ItemService;
+import com.example.lostfound.service.MediaAssetService;
 import com.example.lostfound.service.UserService;
-import com.example.lostfound.util.JwtUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.beans.BeanUtils;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/items")
 public class ItemController {
+    private static final Pattern PUBLIC_PHONE = Pattern.compile("(?<![0-9])1[3-9](?:[\\s-]?[0-9]){9}(?![0-9])");
+    private static final Set<String> PUBLISH_FIELDS = Set.of(
+            "type", "title", "description", "locationName", "category", "imageAssetIds", "tags");
+    private static final Set<String> EDIT_FIELDS = Set.of(
+            "title", "description", "locationName", "category", "imageAssetIds", "tags");
+    private final ItemService items;
+    private final ItemMapper itemMapper;
+    private final UserService users;
+    private final ApplicationService applications;
+    private final ConversationService conversations;
+    private final MediaAssetService mediaAssets;
+    private final ObjectMapper json;
 
-    private final ItemService itemService;
-    private final UserService userService;
-    private final ApplicationService applicationService;
-    private final JwtUtil jwtUtil;
-
-    public ItemController(ItemService itemService, UserService userService,
-                          ApplicationService applicationService, JwtUtil jwtUtil) {
-        this.itemService = itemService;
-        this.userService = userService;
-        this.applicationService = applicationService;
-        this.jwtUtil = jwtUtil;
+    public ItemController(ItemService items, ItemMapper itemMapper, UserService users,
+                          ApplicationService applications, ConversationService conversations,
+                          MediaAssetService mediaAssets, ObjectMapper json) {
+        this.items = items;
+        this.itemMapper = itemMapper;
+        this.users = users;
+        this.applications = applications;
+        this.conversations = conversations;
+        this.mediaAssets = mediaAssets;
+        this.json = json;
     }
 
     @GetMapping
-    public ResponseEntity<Map<String, Object>> getItems(
-            @RequestParam(required = false) String type,
-            @RequestParam(required = false) String category,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
-
-        page = Math.max(page, 1);
-        pageSize = Math.min(Math.max(pageSize, 1), 100);
-
-        Page<Item> result;
-        if (keyword != null && !keyword.isEmpty()) {
-            result = itemService.search(keyword, page, pageSize);
-        } else {
-            result = itemService.findActiveItems(type, category, page, pageSize);
-        }
-
-        // 列表不返回手机号
-        List<Item> items = result.getRecords();
-        items.forEach(i -> i.setPhone(null));
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("items", items);
-        response.put("total", result.getTotal());
-        response.put("page", result.getCurrent());
-        response.put("pageSize", result.getSize());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> list(@RequestParam(required = false) String type,
+                                  @RequestParam(required = false) String category,
+                                  @RequestParam(required = false) String keyword,
+                                  @RequestParam(defaultValue = "1") int page,
+                                  @RequestParam(defaultValue = "20") int pageSize) {
+        int safePage = Math.max(page, 1);
+        int safeSize = Math.min(Math.max(pageSize, 1), 100);
+        Page<Item> result = keyword == null || keyword.isBlank()
+                ? items.findActiveItems(type, category, safePage, safeSize)
+                : items.search(keyword, safePage, safeSize);
+        return ResponseEntity.ok(Map.of("items", result.getRecords().stream().map(this::redactPublicText).toList(), "total", result.getTotal(),
+                "page", result.getCurrent(), "pageSize", result.getSize()));
     }
 
     @GetMapping("/categories")
-    public ResponseEntity<List<String>> getCategories() {
-        List<String> categories = itemService.getCategories();
-        return ResponseEntity.ok(categories);
-    }
+    public ResponseEntity<?> categories() { return ResponseEntity.ok(items.getCategories()); }
 
     @GetMapping("/search")
-    public ResponseEntity<Map<String, Object>> searchItems(
-            @RequestParam String keyword,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
-        page = Math.max(page, 1);
-        pageSize = Math.min(Math.max(pageSize, 1), 100);
-        Page<Item> result = itemService.search(keyword, page, pageSize);
-        List<Item> items = result.getRecords();
-        items.forEach(i -> i.setPhone(null));
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("items", items);
-        response.put("total", result.getTotal());
-        response.put("page", result.getCurrent());
-        response.put("pageSize", result.getSize());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> search(@RequestParam String keyword,
+                                    @RequestParam(defaultValue = "1") int page,
+                                    @RequestParam(defaultValue = "20") int pageSize) {
+        Page<Item> result = items.search(keyword, Math.max(page, 1), Math.min(Math.max(pageSize, 1), 100));
+        return ResponseEntity.ok(Map.of("items", result.getRecords().stream().map(this::redactPublicText).toList(), "total", result.getTotal(),
+                "page", result.getCurrent(), "pageSize", result.getSize()));
     }
 
     @GetMapping("/my")
-    public ResponseEntity<Map<String, Object>> getMyItems(
-            @RequestHeader("Authorization") String token,
-            @RequestParam(required = false) String type,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int pageSize) {
-
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Page<Item> result = itemService.findByPublisherId(userId, page, pageSize);
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("items", result.getRecords());
-        response.put("total", result.getTotal());
-        response.put("page", result.getCurrent());
-        response.put("pageSize", result.getSize());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> mine(@RequestAttribute("userId") Long userId,
+                                  @RequestParam(defaultValue = "1") int page,
+                                  @RequestParam(defaultValue = "20") int pageSize) {
+        Page<Item> result = items.findByPublisherId(userId, Math.max(page, 1), Math.min(Math.max(pageSize, 1), 100));
+        return ResponseEntity.ok(Map.of("items", result.getRecords().stream().map(this::redactPublicText).toList(), "total", result.getTotal(),
+                "page", result.getCurrent(), "pageSize", result.getSize()));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<?> getItemDetail(@PathVariable Long id) {
-        Item item = itemService.findById(id);
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
-        }
-        // 隐藏手机号，需通过 /contact 接口单独获取
-        item.setPhone(null);
-        return ResponseEntity.ok(item);
-    }
-
-    // 单独获取联系方式（需登录+认证，且必须是物品发布者或已关联的申请者）
-    @GetMapping("/{id}/contact")
-    public ResponseEntity<Map<String, Object>> getContact(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long id) {
-
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-
-        // 校验是否已认证
-        if (!userService.isAuthenticated(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "请先完成校园卡认证");
-            return ResponseEntity.status(403).body(error);
-        }
-
-        Item item = itemService.findById(id);
-
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
-        }
-
-        // 权限校验：只有物品发布者或已关联该物品的申请者才能查看联系方式
-        boolean isOwner = item.getPublisherId().equals(userId);
-        boolean isApplicant = applicationService.findByApplicantId(userId).stream()
-                .anyMatch(app -> app.getItemId().equals(id));
-        if (!isOwner && !isApplicant) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "您未参与此物品，无法查看联系方式");
-            return ResponseEntity.status(403).body(error);
-        }
-
-        Map<String, Object> response = new HashMap<>();
-        response.put("phone", item.getPhone());
-        return ResponseEntity.ok(response);
+    public ResponseEntity<?> detail(@PathVariable Long id) {
+        Item item = items.findById(id);
+        return item == null || "deleted".equals(item.getStatus())
+                ? ResponseEntity.notFound().build() : ResponseEntity.ok(redactPublicText(item));
     }
 
     @PostMapping
-    public ResponseEntity<Map<String, Object>> publishItem(
-            @RequestHeader("Authorization") String token,
-            @RequestBody Map<String, Object> request) {
-
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-
-        if (!userService.isAuthenticated(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "请先完成认证");
-            return ResponseEntity.badRequest().body(error);
-        }
-
-        // 校验 type
-        String type = (String) request.get("type");
-        if (type == null || (!"lost".equals(type) && !"found".equals(type))) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "type必须为lost或found");
-            return ResponseEntity.badRequest().body(error);
-        }
-
-        // 校验 title
-        String title = (String) request.get("title");
-        if (title == null || title.trim().isEmpty()) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "标题不能为空");
-            return ResponseEntity.badRequest().body(error);
-        }
-        if (title.length() > 100) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "标题不能超过100字");
-            return ResponseEntity.badRequest().body(error);
-        }
-
-        // 校验 description
-        String description = (String) request.get("description");
-        if (description == null || description.trim().isEmpty()) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "描述不能为空");
-            return ResponseEntity.badRequest().body(error);
-        }
-        if (description.length() > 500) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "描述不能超过500字");
-            return ResponseEntity.badRequest().body(error);
-        }
-
+    public ResponseEntity<?> publish(@RequestAttribute("userId") Long userId,
+                                     @RequestBody Map<String, Object> body) {
+        if (!users.isAuthenticated(userId)) throw new SecurityException("请先完成校园卡认证");
+        rejectLegacySensitiveFields(body);
+        rejectUnknownFields(body, PUBLISH_FIELDS);
+        String type = text(body, "type", 10);
+        if (!"lost".equals(type) && !"found".equals(type)) throw new IllegalArgumentException("type 必须为 lost 或 found");
         Item item = new Item();
         item.setPublisherId(userId);
         item.setType(type);
-
-        // 处理分类
-        String category = (String) request.get("category");
-        List<String> validCategories = itemService.getCategories();
-        if (category != null && validCategories.contains(category)) {
-            item.setCategory(category);
-        } else {
-            item.setCategory("其他物品");
-        }
-
-        item.setTitle(title.trim());
-        item.setDescription(description.trim());
-        item.setLocationName((String) request.get("locationName"));
-        
-        if (request.containsKey("locationLat") && request.containsKey("locationLng")) {
-            item.setLocationLat(((Number) request.get("locationLat")).doubleValue());
-            item.setLocationLng(((Number) request.get("locationLng")).doubleValue());
-        }
-        
-        if (request.containsKey("images")) {
-            item.setImages(request.get("images").toString());
-        }
-        if (request.containsKey("tags")) {
-            item.setTags(request.get("tags").toString());
-        }
-
-        // 处理联系电话
-        if (request.containsKey("phone")) {
-            String phone = (String) request.get("phone");
-            if (phone != null && !phone.trim().isEmpty()) {
-                item.setPhone(phone.trim());
-            }
-        }
-
-        item = itemService.save(item);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("item", item);
-        
-        return ResponseEntity.ok(response);
+        applyEditableFields(item, body, userId, true);
+        items.save(item);
+        return ResponseEntity.ok(Map.of("success", true, "item", item));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> editItem(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long id,
-            @RequestBody Map<String, Object> request) {
-        
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Item item = itemService.findById(id);
-        
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
-        }
-
-        if (!item.getPublisherId().equals(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "无权修改此物品");
-            return ResponseEntity.status(403).body(error);
-        }
-
-        if (!"active".equals(item.getStatus())) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "已过期或已解决的物品不能修改");
-            return ResponseEntity.badRequest().body(error);
-        }
-        
-        if (request.containsKey("title")) {
-            String title = (String) request.get("title");
-            if (title != null && title.length() > 100) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "标题不能超过100字");
-                return ResponseEntity.badRequest().body(error);
-            }
-            item.setTitle(title);
-        }
-        if (request.containsKey("category")) {
-            String cat = (String) request.get("category");
-            List<String> validCategories = itemService.getCategories();
-            if (validCategories.contains(cat)) {
-                item.setCategory(cat);
-            }
-        }
-        if (request.containsKey("description")) {
-            String desc = (String) request.get("description");
-            if (desc != null && desc.length() > 500) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "描述不能超过500字");
-                return ResponseEntity.badRequest().body(error);
-            }
-            item.setDescription(desc);
-        }
-        if (request.containsKey("locationName")) {
-            item.setLocationName((String) request.get("locationName"));
-        }
-        if (request.containsKey("locationLat") && request.containsKey("locationLng")) {
-            item.setLocationLat(((Number) request.get("locationLat")).doubleValue());
-            item.setLocationLng(((Number) request.get("locationLng")).doubleValue());
-        }
-        
-        item = itemService.update(item);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("item", item);
-        
-        return ResponseEntity.ok(response);
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Map<String, Object>> deleteItem(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long id) {
-        
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Item item = itemService.findById(id);
-        
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
-        }
-
-        if (!item.getPublisherId().equals(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "无权删除此物品");
-            return ResponseEntity.status(403).body(error);
-        }
-        
-        applicationService.deleteByItemId(id);
-        itemService.delete(id);
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "删除成功");
-        
-        return ResponseEntity.ok(response);
+    @Transactional
+    public ResponseEntity<?> edit(@RequestAttribute("userId") Long userId, @PathVariable Long id,
+                                  @RequestBody Map<String, Object> body) {
+        rejectLegacySensitiveFields(body);
+        rejectUnknownFields(body, EDIT_FIELDS);
+        Item item = itemMapper.lockById(id);
+        requireOwner(item, userId);
+        if (!"active".equals(item.getStatus())) throw new IllegalStateException("只有公示中的物品可编辑");
+        applyEditableFields(item, body, userId, false);
+        items.update(item);
+        return ResponseEntity.ok(Map.of("success", true, "item", item));
     }
 
     @PostMapping("/{id}/resolve")
-    public ResponseEntity<Map<String, Object>> resolveItem(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long id) {
-        
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Item item = itemService.findById(id);
-        
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
+    @Transactional
+    public ResponseEntity<?> resolve(@RequestAttribute("userId") Long userId, @PathVariable Long id) {
+        Item item = itemMapper.lockById(id);
+        requireOwner(item, userId);
+        if (!"active".equals(item.getStatus()) && !"processing".equals(item.getStatus())) {
+            throw new IllegalStateException("当前状态不能结案");
         }
+        item.setStatus("resolved");
+        items.update(item);
+        applications.closePendingByItemId(id);
+        conversations.closeByItemId(id);
+        return ResponseEntity.ok(Map.of("success", true, "item", item));
+    }
 
-        if (!item.getPublisherId().equals(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "无权操作此物品");
-            return ResponseEntity.status(403).body(error);
+    @PostMapping("/{id}/reopen")
+    @Transactional
+    public ResponseEntity<?> reopen(@RequestAttribute("userId") Long userId, @PathVariable Long id) {
+        Item item = itemMapper.lockById(id);
+        requireOwner(item, userId);
+        if (!"processing".equals(item.getStatus())) throw new IllegalStateException("只有处理中的物品可以重新开放");
+        conversations.closeByItemId(id);
+        item.setStatus("active");
+        if (item.getExpireAt() == null || !item.getExpireAt().isAfter(LocalDateTime.now())) {
+            item.setExpireAt(LocalDateTime.now().plusDays(7));
         }
-
-        itemService.updateStatus(id, "resolved");
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "已标记为已解决");
-        
-        return ResponseEntity.ok(response);
+        items.update(item);
+        return ResponseEntity.ok(Map.of("success", true, "item", item));
     }
 
     @PostMapping("/{id}/renew")
-    public ResponseEntity<Map<String, Object>> renewItem(
-            @RequestHeader("Authorization") String token,
-            @PathVariable Long id) {
-
-        Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Item item = itemService.findById(id);
-
-        if (item == null) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "物品不存在");
-            return ResponseEntity.status(404).body(error);
+    @Transactional
+    public ResponseEntity<?> renew(@RequestAttribute("userId") Long userId, @PathVariable Long id) {
+        Item item = itemMapper.lockById(id);
+        requireOwner(item, userId);
+        if (!"expired".equals(item.getStatus()) && !"active".equals(item.getStatus())) {
+            throw new IllegalStateException("只有公示中或过期的物品可以延期");
         }
-
-        if (!item.getPublisherId().equals(userId)) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "无权操作此物品");
-            return ResponseEntity.status(403).body(error);
+        if ("active".equals(item.getStatus()) && item.getExpireAt() != null
+                && item.getExpireAt().isAfter(LocalDateTime.now().plusDays(3))) {
+            throw new IllegalStateException("离到期尚有三天以上");
         }
-
-        // 已解决的物品不能再延期（防止已解决物品被复活）
-        if ("resolved".equals(item.getStatus())) {
-            Map<String, Object> error = new HashMap<>();
-            error.put("success", false);
-            error.put("message", "已解决的物品不能延期");
-            return ResponseEntity.badRequest().body(error);
-        }
-
-        // 过期或即将过期（3天内）的物品可以延期
-        if ("active".equals(item.getStatus())) {
-            // active 状态下，检查是否在3天内过期
-            if (item.getExpireAt() == null || item.getExpireAt().isAfter(java.time.LocalDateTime.now().plusDays(3))) {
-                Map<String, Object> error = new HashMap<>();
-                error.put("success", false);
-                error.put("message", "物品离过期还有较长时间，暂不支持延期");
-                return ResponseEntity.badRequest().body(error);
-            }
-        }
-
         item.setStatus("active");
-        item.setExpireAt(java.time.LocalDateTime.now().plusDays(7));
-        itemService.update(item);
+        item.setExpireAt(LocalDateTime.now().plusDays(7));
+        items.update(item);
+        return ResponseEntity.ok(Map.of("success", true, "item", item));
+    }
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("success", true);
-        response.put("message", "已延期7天");
-        response.put("item", item);
+    @DeleteMapping("/{id}")
+    @Transactional
+    public ResponseEntity<?> delete(@RequestAttribute("userId") Long userId, @PathVariable Long id) {
+        Item item = itemMapper.lockById(id);
+        requireOwner(item, userId);
+        if ("deleted".equals(item.getStatus())) throw new IllegalStateException("物品已删除");
+        item.setStatus("deleted");
+        items.update(item);
+        applications.closePendingByItemId(id);
+        conversations.closeByItemId(id);
+        return ResponseEntity.ok(Map.of("success", true));
+    }
 
-        return ResponseEntity.ok(response);
+    private void requireOwner(Item item, Long userId) {
+        if (item == null) throw new IllegalArgumentException("物品不存在");
+        if (!userId.equals(item.getPublisherId())) throw new SecurityException("无权操作此物品");
+    }
+
+    private void rejectLegacySensitiveFields(Map<String, Object> body) {
+        if (body.containsKey("phone") || body.containsKey("contact")
+                || body.containsKey("locationLat") || body.containsKey("locationLng")
+                || body.containsKey("latitude") || body.containsKey("longitude")
+                || body.containsKey("images")) {
+            throw new IllegalArgumentException("仅接受文字地点和受控图片资产 ID");
+        }
+    }
+
+    private void rejectUnknownFields(Map<String, Object> body, Set<String> allowed) {
+        if (!allowed.containsAll(body.keySet())) {
+            throw new IllegalArgumentException("请求包含不支持的字段，只能使用受控图片资产 ID");
+        }
+    }
+
+    private void applyEditableFields(Item item, Map<String, Object> body, Long userId, boolean create) {
+        if (create || body.containsKey("title")) item.setTitle(requiredText(body, "title", 100));
+        if (create || body.containsKey("description")) item.setDescription(requiredText(body, "description", 500));
+        if (create || body.containsKey("locationName")) item.setLocationName(requiredText(body, "locationName", 255));
+        if (create || body.containsKey("category")) {
+            String category = text(body, "category", 50);
+            item.setCategory(items.getCategories().contains(category) ? category : "其他物品");
+        }
+        if (create || body.containsKey("imageAssetIds")) {
+            item.setImages(mediaAssets.normalizeItemAssetIds(userId, assetIds(body.get("imageAssetIds"))));
+        }
+        if (create || body.containsKey("tags")) {
+            Object raw = body.get("tags");
+            if (raw == null && create) raw = List.of();
+            if (!(raw instanceof List<?> list) || list.size() > 10) {
+                throw new IllegalArgumentException("tags 必须是不超过 10 项的字符串数组");
+            }
+            List<String> tags = new ArrayList<>();
+            for (Object tag : list) {
+                if (!(tag instanceof String text) || text.isBlank() || text.length() > 30) {
+                    throw new IllegalArgumentException("标签需为 1 到 30 字");
+                }
+                rejectPublicPhone(text);
+                tags.add(text.trim());
+            }
+            try { item.setTags(json.writeValueAsString(tags)); }
+            catch (JsonProcessingException e) { throw new IllegalStateException("标签保存失败", e); }
+        }
+    }
+
+    private List<Long> assetIds(Object raw) {
+        if (raw == null) return List.of();
+        if (!(raw instanceof List<?> values)) throw new IllegalArgumentException("imageAssetIds 必须是数组");
+        List<Long> result = new ArrayList<>();
+        for (Object value : values) {
+            if (value instanceof Number number) result.add(number.longValue());
+            else if (value instanceof String text && text.matches("[0-9]+")) result.add(Long.valueOf(text));
+            else throw new IllegalArgumentException("图片资产 ID 无效");
+        }
+        return result;
+    }
+
+    private String requiredText(Map<String, Object> body, String key, int max) {
+        String value = text(body, key, max);
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(key + " 不能为空");
+        return value;
+    }
+
+    private String text(Map<String, Object> body, String key, int max) {
+        Object raw = body.get(key);
+        if (raw == null) return null;
+        if (!(raw instanceof String value)) throw new IllegalArgumentException(key + " 必须是文本");
+        String trimmed = value.trim();
+        if (trimmed.length() > max) throw new IllegalArgumentException(key + " 过长");
+        rejectPublicPhone(trimmed);
+        return trimmed;
+    }
+
+    private void rejectPublicPhone(String value) {
+        if (PUBLIC_PHONE.matcher(value).find()) {
+            throw new IllegalArgumentException("公开物品信息请勿填写电话号码，请通过申请和私信联系");
+        }
+    }
+
+    private Item redactPublicText(Item item) {
+        Item view = new Item();
+        BeanUtils.copyProperties(item, view);
+        view.setTitle(maskPhone(view.getTitle()));
+        view.setDescription(maskPhone(view.getDescription()));
+        view.setLocationName(maskPhone(view.getLocationName()));
+        view.setTags(maskPhone(view.getTags()));
+        return view;
+    }
+
+    private String maskPhone(String value) {
+        return value == null ? null : PUBLIC_PHONE.matcher(value).replaceAll("[已隐藏联系方式]");
     }
 }

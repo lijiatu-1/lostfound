@@ -47,6 +47,7 @@ public class ItemServiceImpl implements ItemService {
         Page<Item> p = new Page<>(page, pageSize);
         QueryWrapper<Item> wrapper = new QueryWrapper<>();
         wrapper.eq("publisher_id", publisherId)
+               .ne("status", "deleted")
                .orderByDesc("created_at");
         return itemMapper.selectPage(p, wrapper);
     }

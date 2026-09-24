@@ -26,7 +26,8 @@ function getStatusText(status) {
   const statusMap = {
     pending: '待处理',
     accepted: '已通过',
-    rejected: '已拒绝'
+    rejected: '已拒绝',
+    closed: '已关闭'
   }
   return statusMap[status] || status
 }

@@ -1,11 +1,13 @@
-import { itemApi, commentApi } from '../../utils/api.js'
+import { itemApi, applicationApi, commentApi, resolveAssetUrl } from '../../utils/api.js'
 import { formatTimeAgo } from '../../utils/formatTime.js'
 
 Page({
   data: {
-    item: {},
+    item: null,
     comments: [],
+    commentError: '',
     isLoading: true,
+    error: '',
     isOwner: false,
     isAuthenticated: false,
     canRenew: false,
@@ -13,278 +15,121 @@ Page({
   },
 
   onLoad(options) {
-    const id = options.id
-    if (id) {
-      this.loadItem(id)
-    }
+    this.itemId = options.id
+    this.loadItem()
   },
 
-  loadItem(id) {
-    itemApi.getItem(id)
-      .then(res => {
-        const item = res || {}
-        if (item.images) {
-          try {
-            item.imageList = JSON.parse(item.images)
-          } catch (e) {
-            item.imageList = []
-          }
-        }
-        if (item.tags) {
-          try {
-            item.tagList = JSON.parse(item.tags)
-          } catch (e) {
-            item.tagList = []
-          }
-        }
-        item.timeAgo = formatTimeAgo(item.createdAt)
-
-        // 计算是否可以延期（过期、已解决、或3天内过期）
-        const now = new Date()
-        const expireAt = item.expireAt ? new Date(item.expireAt) : null
-        const daysLeft = expireAt ? (expireAt.getTime() - now.getTime()) / (24 * 60 * 60 * 1000) : 999
-        const canRenew = item.status === 'expired' || item.status === 'resolved' || (item.status === 'active' && daysLeft <= 3)
-
-        const app = getApp()
-        const isOwner = app.globalData.userId === item.publisherId
-        this.setData({
-          item: item,
-          isOwner: isOwner,
-          isAuthenticated: app.globalData.isAuthenticated,
-          canRenew: canRenew,
-          isLoading: false
-        })
-        // 无论是否发布者，都加载评论
-        this.loadComments(item.id)
-      })
-      .catch(err => {
-        console.error('加载详情失败:', err)
-        this.setData({
-          isLoading: false,
-          item: this.getMockItem()
-        })
-        wx.showToast({
-          title: err.message || '加载失败，显示示例数据',
-          icon: 'none'
-        })
-      })
+  onShow() {
+    if (this.itemId) this.loadItem()
   },
+
+  loadItem() {
+    this.setData({ isLoading: true, error: '' })
+    itemApi.getItem(this.itemId).then(item => {
+      let images = []
+      let tags = []
+      try { images = JSON.parse(item.images || '[]') } catch (e) {}
+      try { tags = JSON.parse(item.tags || '[]') } catch (e) {}
+      item.imageList = Array.isArray(images) ? images.map(resolveAssetUrl).filter(Boolean) : []
+      item.tagList = Array.isArray(tags) ? tags : []
+      item.timeAgo = formatTimeAgo(item.createdAt)
+      const app = getApp()
+      const expires = item.expireAt ? new Date(item.expireAt).getTime() : 0
+      this.setData({
+        item,
+        isOwner: String(app.globalData.userId) === String(item.publisherId),
+        isAuthenticated: !!app.globalData.isAuthenticated,
+        canRenew: item.status === 'expired' || (item.status === 'active' && expires <= Date.now() + 3 * 86400000),
+        isLoading: false
+      })
+      if (item.type === 'lost') this.loadComments(item.id)
+    }).catch(err => {
+      this.setData({ isLoading: false, item: null, comments: [], commentError: '', error: err.message || '加载失败，请重试' })
+    })
+  },
+
+  retry() { this.loadItem() },
 
   loadComments(itemId) {
-    commentApi.getByItem(itemId)
-      .then(res => {
-        const comments = (res || []).map(c => {
-          c.timeAgo = formatTimeAgo(c.createdAt)
-          return c
-        })
-        this.setData({ comments: comments })
-      })
-      .catch(err => {
-        console.error('加载评论失败:', err)
-      })
+    this.setData({ commentError: '' })
+    commentApi.getByItem(itemId).then(res => {
+      this.setData({ comments: (Array.isArray(res) ? res : []).map(c => ({
+        ...c, timeAgo: formatTimeAgo(c.createdAt)
+      })) })
+    }).catch(err => this.setData({ comments: [], commentError: err.message || '评论加载失败' }))
   },
+  retryComments() { if (this.data.item) this.loadComments(this.data.item.id) },
 
-  getMockItem() {
-    return {
-      id: '1',
-      title: '苹果AirPods Pro蓝牙耳机',
-      type: 'lost',
-      locationName: '图书馆三楼自习室',
-      imageList: [],
-      tagList: ['耳机', '图书馆', '白色'],
-      description: '白色充电盒，左耳耳机丢失，在图书馆自习时发现不见。',
-      timeAgo: '2小时前',
-      publisherId: 1,
-      status: 'active'
-    }
-  },
-
-  // 跳转到编辑页（publish 是 tabBar 页，不能用 navigateTo）
   goEdit() {
-    const app = getApp()
-    app.globalData.editItemId = this.data.item.id
-    wx.switchTab({
-      url: '/pages/publish/publish'
+    getApp().globalData.editItemId = this.data.item.id
+    wx.switchTab({ url: '/pages/publish/publish' })
+  },
+  goToAuth() { wx.navigateTo({ url: '/pages/auth/auth' }) },
+  goApplications() {
+    wx.navigateTo({ url: '/pages/applications/applications?itemId=' + this.data.item.id })
+  },
+
+  apply() {
+    if (!this.data.isAuthenticated) { this.goToAuth(); return }
+    const item = this.data.item
+    if (!item || item.status !== 'active') return
+    wx.showModal({
+      title: item.type === 'found' ? '申请认领' : '提供线索',
+      editable: true,
+      placeholderText: item.type === 'found' ? '请描述能证明物品属于你的信息' : '请描述你掌握的线索',
+      success: res => {
+        if (!res.confirm) return
+        const content = (res.content || '').trim()
+        if (!content) { wx.showToast({ title: '请填写申请内容', icon: 'none' }); return }
+        applicationApi.apply({ itemId: item.id, content })
+          .then(() => wx.showToast({ title: '申请已提交', icon: 'success' }))
+          .catch(err => wx.showToast({ title: err.message || '提交失败', icon: 'none' }))
+      }
     })
   },
 
-  // 跳转到认证页
-  goToAuth() {
-    wx.navigateTo({
-      url: '/pages/auth/auth'
-    })
-  },
-
-  // 复制手机号到剪贴板（需先通过接口获取）
-  copyPhone() {
-    if (!this.data.isAuthenticated) {
-      wx.showModal({
-        title: '需要认证',
-        content: '请先完成校园卡认证后再联系失主',
-        confirmText: '去认证',
-        success: (res) => {
-          if (res.confirm) {
-            wx.navigateTo({ url: '/pages/auth/auth' })
-          }
-        }
-      })
-      return
-    }
-    wx.showLoading({ title: '获取联系方式...' })
-    itemApi.getContact(this.data.item.id)
-      .then(res => {
-        wx.hideLoading()
-        const phone = res && res.phone
-        if (!phone) {
-          wx.showToast({ title: '发布者未留电话', icon: 'none' })
-          return
-        }
-        wx.setClipboardData({
-          data: phone,
-          success: () => {
-            wx.showToast({ title: '已复制手机号', icon: 'none' })
-          }
-        })
-      })
-      .catch(err => {
-        wx.hideLoading()
-        wx.showToast({ title: err.message || '获取联系方式失败', icon: 'none' })
-      })
-  },
-
-  // 评论输入
-  onCommentInput(e) {
-    this.setData({ commentContent: e.detail.value })
-  },
-
-  // 发表评论
+  onCommentInput(e) { this.setData({ commentContent: e.detail.value }) },
   submitComment() {
-    if (!this.data.commentContent.trim()) {
-      wx.showToast({ title: '请输入评论内容', icon: 'none' })
-      return
-    }
-
-    wx.showLoading({ title: '发表中...' })
-
-    commentApi.add({
-      itemId: this.data.item.id,
-      content: this.data.commentContent.trim()
-    })
-      .then(res => {
-        wx.hideLoading()
-        if (res.success) {
-          wx.showToast({ title: '评论成功', icon: 'success' })
-          this.setData({ commentContent: '' })
-          this.loadComments(this.data.item.id)
-        } else {
-          wx.showToast({ title: res.message || '评论失败', icon: 'none' })
-        }
-      })
-      .catch(err => {
-        wx.hideLoading()
-        wx.showToast({ title: err.message || '评论失败', icon: 'none' })
-      })
+    const content = this.data.commentContent.trim()
+    if (!content) return
+    commentApi.add({ itemId: this.data.item.id, content }).then(() => {
+      this.setData({ commentContent: '' })
+      this.loadComments(this.data.item.id)
+    }).catch(err => wx.showToast({ title: err.message || '发表失败', icon: 'none' }))
   },
 
   markResolved() {
     wx.showModal({
-      title: '确认已找回',
-      content: '确定物品已找回/归还吗？',
-      success: (res) => {
-        if (res.confirm) {
-          itemApi.resolve(this.data.item.id)
-            .then(res => {
-              if (res.success) {
-                wx.showToast({
-                  title: '已标记为已解决',
-                  icon: 'success'
-                })
-                this.setData({
-                  'item.status': 'resolved'
-                })
-              } else {
-                wx.showToast({
-                  title: res.message || '操作失败',
-                  icon: 'none'
-                })
-              }
-            })
-            .catch(err => {
-              wx.showToast({
-                title: err.message || '操作失败',
-                icon: 'none'
-              })
-            })
-        }
+      title: '确认结案', content: '结案后私信历史仍可查看，但不能再发送。',
+      success: res => {
+        if (res.confirm) itemApi.resolve(this.data.item.id).then(() => this.loadItem())
+          .catch(err => wx.showToast({ title: err.message || '结案失败', icon: 'none' }))
       }
     })
   },
-
-  previewImage(e) {
-    const current = e.currentTarget.dataset.src
-    wx.previewImage({
-      current: current,
-      urls: this.data.item.imageList || []
+  reopenItem() {
+    wx.showModal({
+      title: '重新开放', content: '当前私信将关闭，物品重新出现在发现列表。',
+      success: res => {
+        if (res.confirm) itemApi.reopen(this.data.item.id).then(() => this.loadItem())
+          .catch(err => wx.showToast({ title: err.message || '重新开放失败', icon: 'none' }))
+      }
     })
   },
-
+  renewItem() {
+    itemApi.renew(this.data.item.id).then(() => this.loadItem())
+      .catch(err => wx.showToast({ title: err.message || '延期失败', icon: 'none' }))
+  },
   deleteItem() {
     wx.showModal({
-      title: '确认删除',
-      content: '确定要删除此物品吗？',
-      success: (res) => {
-        if (res.confirm) {
-          itemApi.delete(this.data.item.id)
-            .then(res => {
-              if (res.success) {
-                wx.showToast({ title: '删除成功', icon: 'success' })
-                setTimeout(() => wx.navigateBack(), 800)
-              } else {
-                wx.showToast({ title: res.message || '删除失败', icon: 'none' })
-              }
-            })
-            .catch(err => {
-              wx.showToast({ title: err.message || '删除失败', icon: 'none' })
-            })
-        }
+      title: '确认删除', content: '此物品将不再公开展示。',
+      success: res => {
+        if (res.confirm) itemApi.delete(this.data.item.id).then(() => wx.navigateBack())
+          .catch(err => wx.showToast({ title: err.message || '删除失败', icon: 'none' }))
       }
     })
   },
-
-  renewItem() {
-    wx.showModal({
-      title: '确认延期',
-      content: '确定要延期7天吗？物品有效期将重新计算。',
-      success: (res) => {
-        if (res.confirm) {
-          itemApi.renew(this.data.item.id)
-            .then(res => {
-              if (res.success) {
-                wx.showToast({ title: '延期成功', icon: 'success' })
-                // 直接用后端返回的数据更新界面，不重新请求
-                const item = res.item
-                if (item) {
-                  if (item.images) {
-                    try { item.imageList = JSON.parse(item.images) } catch (e) { item.imageList = [] }
-                  }
-                  if (item.tags) {
-                    try { item.tagList = JSON.parse(item.tags) } catch (e) { item.tagList = [] }
-                  }
-                  item.timeAgo = formatTimeAgo(item.createdAt)
-                  this.setData({
-                    item: item,
-                    canRenew: false
-                  })
-                }
-              } else {
-                wx.showToast({ title: res.message || '延期失败', icon: 'none' })
-              }
-            })
-            .catch(err => {
-              wx.showToast({ title: err.message || '延期失败', icon: 'none' })
-            })
-        }
-      }
-    })
+  previewImage(e) {
+    wx.previewImage({ current: e.currentTarget.dataset.src, urls: this.data.item.imageList })
   }
 })

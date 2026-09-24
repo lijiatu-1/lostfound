@@ -78,6 +78,10 @@ public class ImageController {
             @RequestParam(value = "purpose", defaultValue = MediaAssetService.PURPOSE_ITEM) String purpose) {
         try {
             String normalizedPurpose = normalizePurpose(purpose);
+            if (MediaAssetService.PURPOSE_ITEM.equals(normalizedPurpose)
+                    && !userService.isAuthenticated(userId)) {
+                return error(HttpStatus.FORBIDDEN, "请先完成校园卡认证");
+            }
             if (file == null || file.isEmpty()) {
                 return error(HttpStatus.BAD_REQUEST, "文件不能为空");
             }
@@ -166,7 +170,7 @@ public class ImageController {
             }
             ResponseEntity.BodyBuilder response = ResponseEntity.ok()
                     .contentType(contentType)
-                    .header(HttpHeaders.X_CONTENT_TYPE_OPTIONS, "nosniff");
+                    .header("X-Content-Type-Options", "nosniff");
             if (Boolean.TRUE.equals(asset.getIsPublic())) {
                 response.cacheControl(CacheControl.maxAge(java.time.Duration.ofHours(1)).cachePublic());
             } else {

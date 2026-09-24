@@ -1,4 +1,4 @@
-import { itemApi } from '../../utils/api.js'
+import { itemApi, resolveAssetUrl } from '../../utils/api.js'
 import { formatTimeAgo } from '../../utils/formatTime.js'
 
 Page({
@@ -10,6 +10,7 @@ Page({
     items: [],
     filteredList: [],
     loading: true,
+    error: '',
     isRefreshing: false
   },
 
@@ -48,6 +49,7 @@ Page({
   },
 
   loadItems() {
+    this.setData({ loading: true, error: '' })
     const type = this.data.currentTab === 1 ? 'lost' : (this.data.currentTab === 2 ? 'found' : '')
     const params = {}
     if (type) params.type = type
@@ -66,33 +68,21 @@ Page({
           }
           return item
         })
-        this.setData({ items, filteredList: items, loading: false, isRefreshing: false })
+        this.setData({ items, filteredList: items, loading: false, isRefreshing: false, error: '' })
         wx.stopPullDownRefresh()
       })
       .catch(err => {
         console.error('加载列表失败:', err)
-        this.setData({ items: this.getMockItems(), loading: false, isRefreshing: false }, () => {
-          this.filterItems()
-        })
+        this.setData({ items: [], filteredList: [], loading: false, isRefreshing: false, error: err.message || '加载失败，请重试' })
         wx.stopPullDownRefresh()
       })
-  },
-
-  getMockItems() {
-    return [
-      { id: 1, title: '苹果AirPods Pro蓝牙耳机', type: 'lost', locationName: '图书馆三楼自习室', timeAgo: '2小时前', status: 'active', imageList: [] },
-      { id: 2, title: '华为Mate40手机', type: 'lost', locationName: '一食堂二楼', timeAgo: '昨天', status: 'active', imageList: [] },
-      { id: 3, title: '学生证', type: 'lost', locationName: '教学楼A栋', timeAgo: '3天前', status: 'active', imageList: [] },
-      { id: 4, title: '蓝色钱包', type: 'found', locationName: '体育馆门口', timeAgo: '3小时前', status: 'active', imageList: [] },
-      { id: 5, title: '小米充电宝', type: 'found', locationName: '图书馆一楼', timeAgo: '1天前', status: 'active', imageList: [] },
-      { id: 6, title: '雨伞', type: 'found', locationName: '教学楼B栋', timeAgo: '2天前', status: 'active', imageList: [] }
-    ]
   },
 
   parseImages(images) {
     if (!images) return []
     try {
-      return JSON.parse(images)
+      const parsed = JSON.parse(images)
+      return Array.isArray(parsed) ? parsed.map(resolveAssetUrl).filter(Boolean) : []
     } catch (e) {
       return []
     }

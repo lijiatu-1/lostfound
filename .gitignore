@@ -41,3 +41,6 @@ application-local.yml
 
 # Generated per-environment mini-program API origin. Never commit deployment-only settings.
 utils/runtime-config.local.js
+
+# Local assistant settings may contain session tokens; never commit them.
+.claude/

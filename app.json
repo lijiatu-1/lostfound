@@ -8,6 +8,9 @@
     "pages/messages/messages",
     "pages/my-publish/my-publish",
     "pages/my-claim/my-claim",
+    "pages/applications/applications",
+    "pages/conversations/conversations",
+    "pages/chat/chat",
     "pages/admin-cert/admin-cert"
   ],
   "window": {

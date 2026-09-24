@@ -5,7 +5,8 @@ Page({
   data: {
     currentTab: 'all',
     publishList: [],
-    filteredList: []
+    filteredList: [],
+    error: ''
   },
 
   onLoad() {
@@ -24,26 +25,19 @@ Page({
           item.timeAgo = formatTimeAgo(item.createdAt)
           return item
         })
-        this.setData({ publishList: items }, () => {
+        this.setData({ publishList: items, error: '' }, () => {
           this.filterItems()
         })
       })
       .catch(err => {
         console.error('加载我的发布失败:', err)
-        this.setData({ publishList: this.getMockItems() }, () => {
+        this.setData({ publishList: [], error: err.message || '加载失败，请重试' }, () => {
           this.filterItems()
         })
       })
   },
 
-  getMockItems() {
-    return [
-      { id: 1, type: 'lost', title: '蓝色蓝牙耳机丢失', locationName: '图书馆三楼', timeAgo: '2小时前', status: 'active' },
-      { id: 2, type: 'found', title: '捡到校园卡一张', locationName: '一食堂门口', timeAgo: '5小时前', status: 'active' },
-      { id: 3, type: 'lost', title: '黑色笔记本电脑', locationName: '教学楼A栋302教室', timeAgo: '3天前', status: 'expired' }
-    ]
-  },
-
+  retry() { this.loadPublishList() },
   setTab(e) {
     const tab = e.currentTarget.dataset.tab
     this.setData({ currentTab: tab }, () => {

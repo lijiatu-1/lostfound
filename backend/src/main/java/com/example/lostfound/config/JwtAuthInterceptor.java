@@ -23,15 +23,6 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     // 不需要认证的路径前缀
-    private static final Set<String> PUBLIC_PATHS = Set.of(
-            "/api/auth/login",
-            "/api/items",
-            "/api/items/categories",
-            "/api/items/search",
-            "/api/ai/recognize",
-            "/api/comments/item"
-    );
-
     public JwtAuthInterceptor(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
     }
@@ -75,12 +66,15 @@ public class JwtAuthInterceptor implements HandlerInterceptor {
         if (path.equals("/api/auth/login")) return true;
 
         // GET /api/items 和 /api/items/{id} 公开（列表和详情）
-        if (path.startsWith("/api/items") && "GET".equals(method)) return true;
+        if ("GET".equals(method) && (path.equals("/api/items")
+                || path.equals("/api/items/categories") || path.equals("/api/items/search")
+                || path.matches("/api/items/[0-9]+"))) return true;
+
+        // Item images can be read anonymously; private certification photos are
+        // checked inside ImageController against the optional JWT.
+        if ("GET".equals(method) && path.matches("/api/assets/[0-9]+/content")) return true;
 
         // 分类和搜索公开
-        if (path.startsWith("/api/items/categories")) return true;
-        if (path.startsWith("/api/items/search")) return true;
-
         // 评论查看公开
         if (path.startsWith("/api/comments/item") && "GET".equals(method)) return true;
 

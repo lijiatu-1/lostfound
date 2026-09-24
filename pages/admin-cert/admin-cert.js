@@ -1,10 +1,11 @@
-import { authApi } from '../../utils/api.js'
+import { authApi, downloadPrivateAsset } from '../../utils/api.js'
 import { formatTimeAgo } from '../../utils/formatTime.js'
 
 Page({
   data: {
     certList: [],
-    isLoading: true
+    isLoading: true,
+    error: ''
   },
 
   onLoad() {
@@ -24,20 +25,23 @@ Page({
           cert.timeAgo = formatTimeAgo(cert.createdAt)
           return cert
         })
-        this.setData({ certList: list, isLoading: false })
+        this.setData({ certList: list, isLoading: false, error: '' })
+        list.forEach((cert, index) => {
+          if (!/^[0-9]+$/.test(String(cert.cardPhoto || ''))) return
+          downloadPrivateAsset(cert.cardPhoto).then(localPath => {
+            this.setData({ [`certList[${index}].cardLocalUrl`]: localPath })
+          }).catch(() => {
+            this.setData({ [`certList[${index}].cardError`]: '校园卡图片加载失败' })
+          })
+        })
       })
       .catch(err => {
         console.error('加载认证列表失败:', err)
-        this.setData({ certList: this.getMockItems(), isLoading: false })
+        this.setData({ certList: [], isLoading: false, error: err.message || '加载失败，请重试' })
       })
   },
 
-  getMockItems() {
-    return [
-      { id: 1, userId: 3, realName: '王同学', studentId: '2023001003', timeAgo: '1小时前', status: 'pending' }
-    ]
-  },
-
+  retry() { this.loadPendingList() },
   handleReview(e) {
     const certId = e.currentTarget.dataset.id
     const action = e.currentTarget.dataset.action

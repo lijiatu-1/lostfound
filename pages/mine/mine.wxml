@@ -1,4 +1,8 @@
 <view class="container">
+  <view wx:if="{{error}}" class="empty-state">
+    <text>{{error}}</text>
+    <button bindtap="retry">重试</button>
+  </view>
   <!-- 用户卡片 -->
   <view class="user-card">
     <view class="user-avatar">
@@ -51,6 +55,12 @@
         <view class="menu-icon">📦</view>
         <text class="menu-text">我的发布</text>
         <text class="menu-arrow">></text>
+      </view>
+      <view class="menu-item" bindtap="goToMyApplications">
+        <view class="menu-icon">🤝</view><text class="menu-text">我的申请</text><text class="menu-arrow">></text>
+      </view>
+      <view class="menu-item" bindtap="goToConversations">
+        <view class="menu-icon">💬</view><text class="menu-text">私信会话</text><text class="menu-arrow">></text>
       </view>
     </view>
   </view>

@@ -31,18 +31,18 @@ public class Item {
     @TableField("description")
     private String description;
 
-    @TableField("phone")
+    @TableField(value = "phone", select = false)
     @JsonIgnore
     private String phone;
 
     @TableField("location_name")
     private String locationName;
 
-    @TableField("location_lat")
+    @TableField(value = "location_lat", select = false)
     @JsonIgnore
     private Double locationLat;
 
-    @TableField("location_lng")
+    @TableField(value = "location_lng", select = false)
     @JsonIgnore
     private Double locationLng;
 

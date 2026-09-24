@@ -180,15 +180,14 @@ Page({
   aiRecognize() {
     if (!this.data.imageAssets.length || this.data.aiLoading) return
     const { title, description } = this.data.formData
-    if (title.trim() || description.trim()) {
-      wx.showModal({
-        title: '确认覆盖',
-        content: 'AI识别会覆盖已填写的标题和描述，确定继续吗？',
-        success: (modal) => { if (modal.confirm) this.doAiRecognize() }
-      })
-      return
-    }
-    this.doAiRecognize()
+    const overwrite = title.trim() || description.trim()
+    wx.showModal({
+      title: '确认 AI 识图',
+      content: '将把你选择的第一张物品照片发送给智谱 AI 识别，默认每人每天最多 5 次。'
+        + (overwrite ? '识别结果会覆盖已填写的标题和描述。' : '识别后请检查并补充信息。'),
+      confirmText: '同意识图',
+      success: (modal) => { if (modal.confirm) this.doAiRecognize() }
+    })
   },
 
   doAiRecognize() {
@@ -234,12 +233,13 @@ Page({
     }
 
     const wasEditing = this.data.editMode
+    const editedId = this.data.editId
     const data = {
       title: title.trim(),
       description: description.trim(),
       locationName: location.trim(),
       category: this.data.selectedCategory,
-      tags: JSON.stringify(this.getTags(title, description)),
+      tags: this.getTags(title, description),
       imageAssetIds: this.data.imageAssets.map((asset) => asset.assetId)
     }
     if (!wasEditing) data.type = this.data.type
@@ -252,7 +252,12 @@ Page({
         wx.showToast({ title: wasEditing ? '保存成功' : '发布成功', icon: 'success' })
         this.resetForm()
         setTimeout(() => {
-          if (wasEditing) wx.navigateBack()
+          if (wasEditing) {
+            wx.switchTab({
+              url: '/pages/mine/mine',
+              success: () => setTimeout(() => wx.navigateTo({ url: '/pages/detail/detail?id=' + editedId }), 100)
+            })
+          }
           else wx.switchTab({ url: '/pages/index/index' })
         }, 700)
       })

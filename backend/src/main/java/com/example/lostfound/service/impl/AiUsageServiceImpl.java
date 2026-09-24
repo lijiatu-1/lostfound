@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 @Service
 public class AiUsageServiceImpl implements AiUsageService {
@@ -19,7 +20,8 @@ public class AiUsageServiceImpl implements AiUsageService {
     public AiUsageServiceImpl(AiUsageMapper aiUsageMapper,
                               @Value("${ai.daily-limit:5}") int dailyLimit) {
         this.aiUsageMapper = aiUsageMapper;
-        this.dailyLimit = Math.max(1, dailyLimit);
+        // The consented transfer scope is at most five images per person and day.
+        this.dailyLimit = Math.max(1, Math.min(5, dailyLimit));
     }
 
     @Override
@@ -28,7 +30,7 @@ public class AiUsageServiceImpl implements AiUsageService {
         if (userId == null) {
             return false;
         }
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Shanghai"));
         if (aiUsageMapper.incrementIfBelowLimit(userId, today, dailyLimit) == 1) {
             return true;
         }

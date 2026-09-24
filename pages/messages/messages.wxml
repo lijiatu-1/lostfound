@@ -1,6 +1,7 @@
 <view class="container">
   <view class="msg-header">
     <text class="msg-title">消息中心</text>
+    <text class="msg-mark-all" bindtap="goChats">私信</text>
     <text class="msg-mark-all" bindtap="markAllRead">全部已读</text>
   </view>
 
@@ -8,6 +9,9 @@
     <text class="loading-text">加载中...</text>
   </view>
 
+  <view wx:elif="{{error}}" class="empty-state">
+    <text>{{error}}</text><button bindtap="retry">重试</button>
+  </view>
   <scroll-view wx:else scroll-y class="msg-list">
     <view class="msg-item" wx:for="{{messages}}" wx:key="id" bindtap="goToDetail" data-id="{{item.id}}" data-item-id="{{item.relatedItemId}}">
       <view class="msg-content">

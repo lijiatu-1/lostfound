@@ -3,6 +3,7 @@ package com.example.lostfound.controller;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.lostfound.entity.Message;
 import com.example.lostfound.service.MessageService;
+import com.example.lostfound.service.ConversationService;
 import com.example.lostfound.util.JwtUtil;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,10 +17,12 @@ import java.util.Map;
 public class MessageController {
 
     private final MessageService messageService;
+    private final ConversationService conversationService;
     private final JwtUtil jwtUtil;
 
-    public MessageController(MessageService messageService, JwtUtil jwtUtil) {
+    public MessageController(MessageService messageService, ConversationService conversationService, JwtUtil jwtUtil) {
         this.messageService = messageService;
+        this.conversationService = conversationService;
         this.jwtUtil = jwtUtil;
     }
 
@@ -41,10 +44,13 @@ public class MessageController {
     @GetMapping("/count")
     public ResponseEntity<Map<String, Object>> getUnreadCount(@RequestHeader("Authorization") String token) {
         Long userId = jwtUtil.getUserIdFromToken(jwtUtil.extractToken(token));
-        Integer count = messageService.countUnread(userId);
+        Integer notificationCount = messageService.countUnread(userId);
+        long conversationCount = conversationService.countUnread(userId);
         
         Map<String, Object> response = new HashMap<>();
-        response.put("count", count);
+        response.put("count", notificationCount + conversationCount);
+        response.put("notificationCount", notificationCount);
+        response.put("conversationCount", conversationCount);
         
         return ResponseEntity.ok(response);
     }

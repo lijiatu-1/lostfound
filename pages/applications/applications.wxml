@@ -1,0 +1,18 @@
+<view class="page">
+  <view class="title">收到的申请</view>
+  <view wx:if="{{loading}}" class="state">加载中...</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button bindtap="retry">重试</button></view>
+  <view wx:elif="{{!applications.length}}" class="state">暂无申请</view>
+  <view wx:else>
+    <view class="card" wx:for="{{applications}}" wx:key="id">
+      <view class="meta">{{item.type === 'claim' ? '申请认领' : '提供线索'}} · {{item.timeAgo}}</view>
+      <view class="content">{{item.content}}</view>
+      <view class="status">状态：{{item.status === 'pending' ? '待处理' : item.status === 'accepted' ? '已批准' : item.status === 'closed' ? '已关闭' : '已拒绝'}}</view>
+      <view class="actions" wx:if="{{item.status === 'pending'}}">
+        <button size="mini" data-id="{{item.id}}" data-action="reject" bindtap="handle">拒绝</button>
+        <button size="mini" type="primary" data-id="{{item.id}}" data-action="accept" bindtap="handle">批准并私信</button>
+      </view>
+      <button wx:if="{{item.status === 'accepted'}}" size="mini" bindtap="goChats">查看私信</button>
+    </view>
+  </view>
+</view>

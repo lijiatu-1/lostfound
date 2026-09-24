@@ -1,9 +1,10 @@
-import { applicationApi } from '../../utils/api.js'
+import { applicationApi, conversationApi } from '../../utils/api.js'
 import { formatTimeAgo, getStatusText } from '../../utils/formatTime.js'
 
 Page({
   data: {
-    claimList: []
+    claimList: [],
+    error: ''
   },
 
   onLoad() {
@@ -22,22 +23,23 @@ Page({
           app.statusText = getStatusText(app.status)
           return app
         })
-        this.setData({ claimList: list })
+        this.setData({ claimList: list, error: '' })
+        conversationApi.getConversations().then(result => {
+          const byApplication = {}
+          ;((result && result.conversations) || []).forEach(c => { byApplication[c.applicationId] = c.id })
+          this.setData({ claimList: list.map(a => ({ ...a, conversationId: byApplication[a.id] || null })) })
+        }).catch(() => {})
       })
       .catch(err => {
         console.error('加载我的申请失败:', err)
-        this.setData({ claimList: this.getMockItems() })
+        this.setData({ claimList: [], error: err.message || '加载失败，请重试' })
       })
   },
 
-  getMockItems() {
-    return [
-      { id: 1, itemId: 1, type: 'claim', content: '这是我的耳机！上有贴纸。', status: 'pending', statusText: '待处理', timeAgo: '5小时前' },
-      { id: 2, itemId: 4, type: 'help', content: '我在体育馆见过这个钱包。', status: 'accepted', statusText: '已通过', timeAgo: '昨天' },
-      { id: 3, itemId: 5, type: 'claim', content: '充电宝是我丢的，白色小米。', status: 'rejected', statusText: '已拒绝', timeAgo: '3天前' }
-    ]
+  retry() { this.loadClaimList() },
+  goToChat(e) {
+    wx.navigateTo({ url: '/pages/chat/chat?id=' + e.currentTarget.dataset.id })
   },
-
   goToDetail(e) {
     const itemId = e.currentTarget.dataset.itemId
     if (itemId) {

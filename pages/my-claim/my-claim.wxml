@@ -12,10 +12,15 @@
         </view>
         <text class="card-title">{{item.content}}</text>
         <text class="card-info">{{item.timeAgo}}</text>
+        <button wx:if="{{item.conversationId}}" size="mini" catchtap="goToChat" data-id="{{item.conversationId}}">打开私信</button>
       </view>
     </view>
 
-    <view class="empty-state" wx:if="{{claimList.length === 0}}">
+    <view class="empty-state" wx:if="{{error}}">
+      <text class="empty-text">{{error}}</text>
+      <button bindtap="retry">重试</button>
+    </view>
+    <view class="empty-state" wx:elif="{{claimList.length === 0}}">
       <text class="empty-icon">🤝</text>
       <text class="empty-text">暂无申请记录</text>
     </view>

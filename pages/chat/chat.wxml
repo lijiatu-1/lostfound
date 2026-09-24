@@ -1,0 +1,18 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">加载中...</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button bindtap="retry">重试</button></view>
+  <block wx:else>
+    <view class="state" wx:if="{{conversation.status !== 'open'}}">会话已结束，历史消息可查看</view>
+    <scroll-view scroll-y class="messages">
+      <view class="empty" wx:if="{{!messages.length}}">暂无消息，开始沟通吧</view>
+      <view class="row {{item.mine ? 'mine' : ''}}" wx:for="{{messages}}" wx:key="id">
+        <view class="bubble">{{item.content}}</view>
+        <view class="time">{{item.timeAgo}}</view>
+      </view>
+    </scroll-view>
+    <view class="composer" wx:if="{{conversation.status === 'open'}}">
+      <input value="{{draft}}" maxlength="2000" placeholder="输入文字消息" bindinput="input" />
+      <button size="mini" type="primary" loading="{{sending}}" bindtap="send">发送</button>
+    </view>
+  </block>
+</view>

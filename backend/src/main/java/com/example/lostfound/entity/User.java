@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import java.time.LocalDateTime;
 
@@ -37,6 +38,7 @@ public class User {
     private String studentId;
 
     @TableField("card_photo")
+    @JsonIgnore
     private String cardPhoto;
 
     @TableField("created_at")

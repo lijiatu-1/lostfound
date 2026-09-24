@@ -44,7 +44,7 @@
     </view>
     <view class="form-item">
       <text class="form-label">描述</text>
-      <textarea class="form-textarea" placeholder="请详细描述物品特征、丢失/捡到时间等信息" value="{{formData.description}}" bindinput="onInput" data-field="description" maxlength="1000" />
+      <textarea class="form-textarea" placeholder="请详细描述物品特征、丢失/捡到时间等信息" value="{{formData.description}}" bindinput="onInput" data-field="description" maxlength="500" />
     </view>
     <view class="form-item">
       <text class="form-label">标签</text>

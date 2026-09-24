@@ -1,0 +1,10 @@
+.page { min-height: 100vh; display: flex; flex-direction: column; background: #f5f7f6; }
+.state,.empty { color: #777; text-align: center; padding: 40rpx; }
+.messages { flex: 1; padding: 24rpx; box-sizing: border-box; }
+.row { margin: 20rpx 0; max-width: 78%; }
+.row.mine { margin-left: auto; text-align: right; }
+.bubble { display: inline-block; padding: 18rpx 24rpx; background: #fff; border-radius: 16rpx; text-align: left; white-space: pre-wrap; }
+.mine .bubble { background: #c6f0d8; }
+.time { color: #999; font-size: 22rpx; margin-top: 6rpx; }
+.composer { display: flex; padding: 20rpx; background: #fff; gap: 16rpx; }
+.composer input { flex: 1; padding: 12rpx; }

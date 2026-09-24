@@ -4,6 +4,7 @@ import com.example.lostfound.entity.Certification;
 import com.example.lostfound.entity.User;
 import com.example.lostfound.service.CertificationService;
 import com.example.lostfound.service.MessageService;
+import com.example.lostfound.service.MediaAssetService;
 import com.example.lostfound.service.UserService;
 import com.example.lostfound.util.JwtUtil;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ public class AuthController {
     private final MessageService messageService;
     private final CertificationService certificationService;
     private final JwtUtil jwtUtil;
+    private final MediaAssetService mediaAssets;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${wechat.appid}")
@@ -35,11 +37,13 @@ public class AuthController {
     private String wechatSecret;
 
     public AuthController(UserService userService, MessageService messageService,
-                          CertificationService certificationService, JwtUtil jwtUtil) {
+                          CertificationService certificationService, JwtUtil jwtUtil,
+                          MediaAssetService mediaAssets) {
         this.userService = userService;
         this.messageService = messageService;
         this.certificationService = certificationService;
         this.jwtUtil = jwtUtil;
+        this.mediaAssets = mediaAssets;
     }
 
     @PostMapping("/login")
@@ -102,17 +106,16 @@ public class AuthController {
             return code;
         }
 
-        // 如果 secret 没配置，仅在 dev 环境下返回 mock openid
-        if ("your_app_secret_here".equals(wechatSecret) && "dev".equals(activeProfile)) {
-            System.out.println("[开发模式] 微信 AppSecret 未配置，使用 mock openid");
-            return "mock_openid_" + code;
+        if (wechatAppid == null || wechatAppid.isBlank()
+                || wechatSecret == null || wechatSecret.isBlank()) {
+            return null;
         }
 
         try {
             String url = "https://api.weixin.qq.com/sns/jscode2session"
                     + "?appid=" + wechatAppid
                     + "&secret=" + wechatSecret
-                    + "&js_code=" + code
+                    + "&js_code=" + java.net.URLEncoder.encode(code, java.nio.charset.StandardCharsets.UTF_8)
                     + "&grant_type=authorization_code";
 
             String response = restTemplate.getForObject(url, String.class);
@@ -131,7 +134,7 @@ public class AuthController {
                 }
                 // 检查是否有错误
                 if (response.contains("\"errcode\"")) {
-                    System.err.println("微信登录失败: " + response);
+                    log.warn("微信登录返回错误码");
                 }
             }
             return null;
@@ -181,15 +184,18 @@ public class AuthController {
 
             String realName = request.get("realName");
             String studentId = request.get("studentId");
-            String cardPhoto = request.get("cardPhoto");
+            String cardPhotoId = request.get("cardPhotoAssetId");
 
             if (realName == null || realName.trim().isEmpty() ||
-                studentId == null || studentId.trim().isEmpty()) {
+                studentId == null || studentId.trim().isEmpty() ||
+                cardPhotoId == null || !cardPhotoId.matches("[0-9]+")) {
                 Map<String, Object> error = new HashMap<>();
                 error.put("success", false);
-                error.put("message", "姓名和学号不能为空");
+                error.put("message", "姓名、学号和受控校园卡图片均为必填");
                 return ResponseEntity.badRequest().body(error);
             }
+            mediaAssets.requireOwnedAsset(userId, Long.valueOf(cardPhotoId),
+                    MediaAssetService.PURPOSE_CERTIFICATION);
 
             // 检查是否已有认证记录
             java.util.List<Certification> existingList = certificationService.findByUserId(userId);
@@ -207,7 +213,7 @@ public class AuthController {
                 cert = existing;
                 cert.setRealName(realName.trim());
                 cert.setStudentId(studentId.trim());
-                cert.setCardPhoto(cardPhoto);
+                cert.setCardPhoto(cardPhotoId);
                 cert.setStatus("pending");
                 cert.setReviewerId(null);
                 cert.setReviewMsg(null);
@@ -217,7 +223,7 @@ public class AuthController {
                 cert.setUserId(userId);
                 cert.setRealName(realName.trim());
                 cert.setStudentId(studentId.trim());
-                cert.setCardPhoto(cardPhoto);
+                cert.setCardPhoto(cardPhotoId);
                 cert.setStatus("pending");
                 certificationService.save(cert);
             }
@@ -232,6 +238,8 @@ public class AuthController {
             response.put("success", true);
             response.put("message", "认证申请已提交，请等待审核");
             return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
             log.error("提交认证失败", e);
             Map<String, Object> error = new HashMap<>();

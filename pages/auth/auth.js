@@ -60,7 +60,7 @@ Page({
             uploadImage(tempPath, 'certification')
               .then(asset => {
                 wx.hideLoading()
-                this.setData({ cardPhotoAssetId: asset.assetId, cardPhotoUrl: asset.url, tempPhoto: '' })
+                this.setData({ cardPhotoAssetId: asset.assetId, cardPhotoUrl: tempPath, tempPhoto: '' })
               })
               .catch(err => {
                 wx.hideLoading()

@@ -1,0 +1,26 @@
+name: Backend verify
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan current source for secrets
+        run: docker run --rm -v "${{ github.workspace }}:/repo:ro" ghcr.io/gitleaks/gitleaks:v8.24.2 dir /repo --redact
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+          cache-dependency-path: backend/pom.xml
+      - name: Verify with MySQL Testcontainers and Flyway
+        working-directory: backend
+        run: mvn --batch-mode verify
+      - name: Require integration tests to run
+        working-directory: backend
+        run: |
+          test -f target/surefire-reports/TEST-com.example.lostfound.WorkflowIntegrationTest.xml
+          ! grep -qE 'skipped="[1-9][0-9]*"' target/surefire-reports/TEST-com.example.lostfound.WorkflowIntegrationTest.xml

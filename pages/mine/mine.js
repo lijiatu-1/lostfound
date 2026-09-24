@@ -1,4 +1,4 @@
-import { authApi, itemApi, messageApi } from '../../utils/api.js'
+import { authApi, itemApi, messageApi, resolveAssetUrl } from '../../utils/api.js'
 import { formatTimeAgo } from '../../utils/formatTime.js'
 
 Page({
@@ -9,7 +9,8 @@ Page({
     unreadCount: 0,
     myItems: [],
     resolvedCount: 0,
-    isLoading: true
+    isLoading: true,
+    error: ''
   },
 
   onLoad() {
@@ -31,7 +32,8 @@ Page({
         this.setData({
           user: user,
           isAuthenticated: user.status === 'authorized',
-          isAdmin: user.role === 'admin'
+          isAdmin: user.role === 'admin',
+          error: ''
         })
 
         const app = getApp()
@@ -41,27 +43,18 @@ Page({
       })
       .catch(err => {
         console.error('加载用户信息失败:', err)
-        this.setData({
-          user: this.getMockUser()
-        })
+        this.setData({ user: {}, isAuthenticated: false, isAdmin: false, error: err.message || '用户信息加载失败' })
+        const app = getApp()
+        app.globalData.userId = ''
+        app.globalData.isAuthenticated = false
+        app.globalData.isAdmin = false
       })
       .finally(() => {
         this.setData({ isLoading: false })
       })
   },
 
-  getMockUser() {
-    return {
-      id: '1',
-      nickname: '张三',
-      avatarUrl: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=young%20asian%20male%20student%20avatar%20portrait%20smiling&width=512&height=512',
-      status: 'authorized',
-      realName: '张三',
-      studentId: '2023001001',
-      createdAt: '2024-01-01'
-    }
-  },
-
+  retry() { this.loadUserInfo(); this.loadUnreadCount(); this.loadMyItems() },
   loadUnreadCount() {
     messageApi.getUnreadCount()
       .then(res => {
@@ -82,7 +75,7 @@ Page({
           if (item.images) {
             try {
               const imgList = JSON.parse(item.images)
-              item.image = imgList[0] || ''
+              item.image = resolveAssetUrl(imgList[0]) || ''
             } catch (e) {
               item.image = ''
             }
@@ -97,33 +90,12 @@ Page({
       })
       .catch(err => {
         console.error('加载我的发布失败:', err)
-        this.setData({
-          myItems: this.getMockMyItems()
-        })
+        this.setData({ myItems: [], resolvedCount: 0, error: err.message || '我的发布加载失败' })
       })
   },
 
-  getMockMyItems() {
-    return [
-      {
-        id: '1',
-        title: '苹果AirPods Pro蓝牙耳机',
-        type: 'lost',
-        image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=Apple%20AirPods%20Pro%20wireless%20earbuds%20in%20charging%20case%20on%20white%20background&width=512&height=512',
-        timeAgo: '2小时前',
-        status: 'active'
-      },
-      {
-        id: '2',
-        title: '学生证',
-        type: 'lost',
-        image: 'https://neeko-copilot.bytedance.net/api/text2image?prompt=student%20ID%20card%20with%20photo%20on%20white%20background&width=512&height=512',
-        timeAgo: '3天前',
-        status: 'resolved'
-      }
-    ]
-  },
-
+  goToMyApplications() { wx.navigateTo({ url: '/pages/my-claim/my-claim' }) },
+  goToConversations() { wx.navigateTo({ url: '/pages/conversations/conversations' }) },
   goToMyPublish() {
     wx.navigateTo({
       url: '/pages/my-publish/my-publish'

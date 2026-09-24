@@ -3,12 +3,14 @@ package com.example.lostfound.config;
 import com.example.lostfound.entity.*;
 import com.example.lostfound.service.*;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@Profile("dev")
 public class DataInitializer implements CommandLineRunner {
 
     private final UserService userService;
@@ -44,61 +46,61 @@ public class DataInitializer implements CommandLineRunner {
 
         Item item1 = createItem(user1.getId(), "lost", "苹果AirPods Pro蓝牙耳机",
                 "白色充电盒，左耳耳机丢失，在图书馆自习时发现不见。耳机是上周刚买的，充电盒上有轻微划痕。",
-                "图书馆三楼自习室", "[\"耳机\",\"图书馆\",\"白色\"]", now.minusHours(2), "13800138001");
+                "图书馆三楼自习室", "[\"耳机\",\"图书馆\",\"白色\"]", now.minusHours(2));
         item1.setCategory("电子产品");
         itemService.save(item1);
 
         Item item2 = createItem(user1.getId(), "lost", "华为Mate40手机",
                 "黑色手机，带蓝色手机壳，屏幕右上角有轻微裂痕。",
-                "一食堂二楼", "[\"手机\",\"食堂\",\"黑色\"]", now.minusHours(24), "13800138001");
+                "一食堂二楼", "[\"手机\",\"食堂\",\"黑色\"]", now.minusHours(24));
         item2.setCategory("电子产品");
         itemService.save(item2);
 
         Item item3 = createItem(user2.getId(), "lost", "学生证",
                 "计算机学院学生证，姓名李四。在教学楼A栋丢失。",
-                "教学楼A栋", "[\"学生证\",\"教学楼\"]", now.minusDays(3), "13900139002");
+                "教学楼A栋", "[\"学生证\",\"教学楼\"]", now.minusDays(3));
         item3.setCategory("证件卡片");
         itemService.save(item3);
 
         Item item4 = createItem(user2.getId(), "found", "蓝色钱包",
                 "在体育馆门口捡到蓝色钱包一个，内有现金和银行卡。",
-                "体育馆门口", "[\"钱包\",\"体育馆\",\"蓝色\"]", now.minusHours(3), "13900139002");
+                "体育馆门口", "[\"钱包\",\"体育馆\",\"蓝色\"]", now.minusHours(3));
         item4.setCategory("生活用品");
         itemService.save(item4);
 
         Item item5 = createItem(user1.getId(), "found", "小米充电宝",
                 "白色充电宝，10000mAh，在图书馆一楼捡到。",
-                "图书馆一楼", "[\"充电宝\",\"图书馆\",\"白色\"]", now.minusDays(1), "13800138001");
+                "图书馆一楼", "[\"充电宝\",\"图书馆\",\"白色\"]", now.minusDays(1));
         item5.setCategory("电子产品");
         itemService.save(item5);
 
         Item item6 = createItem(user2.getId(), "found", "雨伞",
                 "深蓝色长柄雨伞，在教学楼B栋一楼大厅捡到。",
-                "教学楼B栋", "[\"雨伞\",\"教学楼\",\"蓝色\"]", now.minusDays(2), "13900139002");
+                "教学楼B栋", "[\"雨伞\",\"教学楼\",\"蓝色\"]", now.minusDays(2));
         item6.setCategory("生活用品");
         itemService.save(item6);
 
         // 已过期的物品（测试发布者看到"延期7天"按钮）
         Item item7 = createItem(user1.getId(), "lost", "U盘",
                 "银色金属U盘，64G，里面有课程设计资料。在机房丢失。",
-                "计算机实验室", "[\"U盘\",\"机房\",\"银色\"]", now.minusDays(10), "13800138001");
+                "计算机实验室", "[\"U盘\",\"机房\",\"银色\"]", now.minusDays(10));
         item7.setCategory("电子产品");
         item7.setStatus("expired");
         item7.setExpireAt(now.minusDays(3));
         itemService.save(item7);
 
-        // 已解决的物品（测试发布者看到"延期7天"按钮）
+        // 已解决的物品
         Item item8 = createItem(user2.getId(), "found", "篮球",
                 "斯伯丁篮球，在篮球场捡到，已交给体育部。",
-                "室外篮球场", "[\"篮球\",\"体育\"]", now.minusDays(5), "13900139002");
+                "室外篮球场", "[\"篮球\",\"体育\"]", now.minusDays(5));
         item8.setCategory("其他物品");
         item8.setStatus("resolved");
         itemService.save(item8);
 
-        // 没留手机号的招领帖（测试"发布者未留电话"提示）
+        // 另一条招领帖
         Item item9 = createItem(user2.getId(), "found", "水杯",
                 "粉色保温杯，在教室最后一排捡到。",
-                "教学楼C栋301", "[\"水杯\",\"教室\",\"粉色\"]", now.minusHours(5), null);
+                "教学楼C栋301", "[\"水杯\",\"教室\",\"粉色\"]", now.minusHours(5));
         item9.setCategory("生活用品");
         itemService.save(item9);
 
@@ -185,7 +187,7 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private Item createItem(Long publisherId, String type, String title, String description,
-                            String locationName, String tags, LocalDateTime createdAt, String phone) {
+                            String locationName, String tags, LocalDateTime createdAt) {
         Item item = new Item();
         item.setPublisherId(publisherId);
         item.setType(type);
@@ -197,7 +199,6 @@ public class DataInitializer implements CommandLineRunner {
         item.setExpireAt(createdAt.plusDays(7));
         item.setStatus("active");
         item.setImages("[]");
-        item.setPhone(phone);
         return item;
     }
 }

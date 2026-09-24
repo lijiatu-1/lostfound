@@ -18,6 +18,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/comments")
 public class CommentController {
+    private static final java.util.regex.Pattern PHONE_NUMBER =
+            java.util.regex.Pattern.compile("(?<![0-9])1[3-9][0-9]{9}(?![0-9])");
 
     private final CommentService commentService;
     private final ItemService itemService;
@@ -35,6 +37,8 @@ public class CommentController {
     // 获取某物品的所有评论（附带用户昵称）
     @GetMapping("/item/{itemId}")
     public ResponseEntity<List<Map<String, Object>>> getCommentsByItem(@PathVariable Long itemId) {
+        Item item = itemService.findById(itemId);
+        if (item == null || "deleted".equals(item.getStatus())) return ResponseEntity.notFound().build();
         List<Comment> comments = commentService.findByItemId(itemId);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Comment comment : comments) {
@@ -42,7 +46,7 @@ public class CommentController {
             map.put("id", comment.getId());
             map.put("itemId", comment.getItemId());
             map.put("userId", comment.getUserId());
-            map.put("content", comment.getContent());
+            map.put("content", PHONE_NUMBER.matcher(comment.getContent()).replaceAll("[已隐藏联系方式]"));
             map.put("createdAt", comment.getCreatedAt());
             // 查询用户昵称
             User user = userService.findById(comment.getUserId());
@@ -90,6 +94,9 @@ public class CommentController {
             error.put("success", false);
             error.put("message", "评论内容不能超过500字");
             return ResponseEntity.badRequest().body(error);
+        }
+        if (PHONE_NUMBER.matcher(content).find()) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "message", "公开评论请勿填写电话号码"));
         }
 
         // 只允许对 "lost" 类型的物品评论

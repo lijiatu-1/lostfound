@@ -7,6 +7,7 @@
     <text class="loading-text">加载中...</text>
   </view>
 
+  <view wx:elif="{{error}}" class="empty-state">{{error}}<button bindtap="retry">重试</button></view>
   <scroll-view wx:else scroll-y class="cert-list">
     <block wx:if="{{certList.length === 0}}">
       <view class="empty-state">
@@ -29,6 +30,8 @@
             <text class="cert-label">提交时间</text>
             <text class="cert-value">{{item.timeAgo}}</text>
           </view>
+          <image wx:if="{{item.cardLocalUrl}}" src="{{item.cardLocalUrl}}" mode="aspectFit" style="width: 100%; height: 300rpx;" />
+          <text wx:elif="{{item.cardError}}">{{item.cardError}}</text>
         </view>
         <view class="cert-actions">
           <view class="btn-approve" bindtap="handleReview" data-id="{{item.id}}" data-action="accept">通过</view>
